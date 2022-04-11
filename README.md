@@ -133,8 +133,8 @@ require("lf").start({ mappings = false })
 The only configurable environment variable is `g:lf_replace_netrw`, which can be set to `1` to replace `netrw`
 
 ### TODO
-- `:LfToggle` command
-- Find a way for `lf` to hijack keybindings
+- [ ] `:LfToggle` command
+- [ ] Find a way for `lf` to hijack keybindings
   - This may have to be done by writing to the user's configuration file
   - It would involve mapping each `default_actions` key to the `open` command, which closes the file manager
   - Once the file manager was closed, these would need to be removed
