@@ -26,6 +26,9 @@ require("lf").setup({
   height = 0.80, -- height of the *floating* window
   width = 0.85, -- width of the *floating* window
   mappings = true, -- whether terminal buffer mapping is enabled
+
+  ...
+  ...
 })
 
 vim.api.nvim_set_keymap("n", "<mapping>", "<cmd>lua require('lf').start()", { noremap = true })
@@ -135,4 +138,4 @@ The only configurable environment variable is `g:lf_replace_netrw`, which can be
   - This may have to be done by writing to the user's configuration file
   - It would involve mapping each `default_actions` key to the `open` command, which closes the file manager
   - Once the file manager was closed, these would need to be removed
-- Allow keybindings to cycle through various sizes of the terminal (similar to `rnvimr`) (**partially done**)
+- [x] Cycling through various sizes of the terminal (similar to `rnvimr`)

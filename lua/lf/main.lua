@@ -128,6 +128,7 @@ function Lf:start(path)
   else
     self.term.on_open = function(_)
       self.winid = api.nvim_get_current_win()
+      api.nvim_win_set_option(self.winid, "wrap", true)
     end
   end
 
@@ -218,6 +219,7 @@ function Lf:__on_open(term)
 
   if self.cfg.layout_mapping then
     self.winid = api.nvim_get_current_win()
+    api.nvim_win_set_option(self.winid, "wrap", true)
 
     map(
         "t", self.cfg.layout_mapping, function()
