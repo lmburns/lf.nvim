@@ -30,7 +30,13 @@ end
 ---
 ---@param path string optional path to start in
 function M.start(path, cfg)
-  require("lf.main").Lf:new(cfg or M._cfg):start(path)
+  -- Only one argument was given
+  if path and cfg == nil and type(path) == "table" then
+    require("lf.main").Lf:new(path or M._cfg):start(nil)
+  else
+    require("lf.main").Lf:new(cfg or M._cfg):start(path)
+  end
+
 end
 
 return M

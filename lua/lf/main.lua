@@ -20,7 +20,7 @@ end
 local api = vim.api
 local fn = vim.fn
 local uv = vim.loop
-local g = vim.g
+local o = vim.o
 local map = utils.map
 
 ---Error for this program
@@ -37,6 +37,8 @@ local Terminal = require("toggleterm.terminal").Terminal
 --- @field cfg Config Configuration options
 --- @field cwd string Current working directory
 --- @field term Terminal Toggle terminal
+--- @field view_idx number Current index of configuration `views`
+--- @field winid number `Terminal` window id
 local Lf = {}
 
 local function setup_term()
@@ -76,7 +78,8 @@ function Lf:new(config)
     self.cfg = Config
   end
 
-  self.bufnr = nil
+  self.view_idx = 1
+  self.winid = nil
 
   -- TODO: use or del
   self.cwd = uv.cwd()
@@ -124,7 +127,7 @@ function Lf:start(path)
     end
   else
     self.term.on_open = function(_)
-      self.bufnr = api.nvim_get_current_buf()
+      self.winid = api.nvim_get_current_win()
     end
   end
 
@@ -203,13 +206,27 @@ end
 function Lf:__on_open(term)
   -- api.nvim_command("setlocal filetype=lf")
   M.loaded = true
-  self.bufnr = api.nvim_get_current_buf()
+
   for key, mapping in pairs(self.cfg.default_actions) do
     map(
         "t", key, function()
           self.cfg.default_action = mapping
           notify(("Default action changed: %s"):format(mapping))
         end, { noremap = true, buffer = term.bufnr }
+    )
+  end
+
+  if self.cfg.layout_mapping then
+    self.winid = api.nvim_get_current_win()
+
+    map(
+        "t", self.cfg.layout_mapping, function()
+          api.nvim_win_set_config(
+              self.winid, M.get_view(self.cfg.views[self.view_idx])
+          )
+          self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or
+                              1
+        end
     )
   end
 end
@@ -255,6 +272,31 @@ function Lf:__callback(term)
       end
     end
   end
+end
+
+---Get the table that is passed to `api.nvim_win_set_config`
+---@param opts table
+---@return table
+function M.get_view(opts)
+  opts = opts or {}
+  local width = opts.width or
+                    math.ceil(math.min(o.columns, math.max(80, o.columns - 20)))
+  local height = opts.height or
+                     math.ceil(math.min(o.lines, math.max(20, o.lines - 10)))
+
+  width = fn.float2nr(width * o.columns)
+  height = fn.float2nr(fn.round(height * o.lines))
+  local col = fn.float2nr(fn.round((o.columns - width) / 2))
+  local row = fn.float2nr(fn.round((o.lines - height) / 2))
+
+  return {
+    col = col,
+    row = row,
+    relative = "editor",
+    style = "minimal",
+    width = width,
+    height = height,
+  }
 end
 
 M.Lf = Lf

@@ -11,6 +11,9 @@
 --- @field mappings boolean whether terminal buffer mappings should be set
 local Config = {}
 
+local fn = vim.fn
+local o = vim.o
+
 -- A local function that runs each time allows for a global `.setup()` to work
 
 --- Initialize the default configuration
@@ -35,6 +38,19 @@ local function init()
     height = 0.80,
     width = 0.85,
     mappings = true,
+
+    -- Layout configurations
+    layout_mapping = "<A-u>",
+
+    views = {
+      { width = 0.600, height = 0.600 },
+      {
+        width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
+        height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines,
+      },
+      { width = 0.800, height = 0.800 },
+      { width = 0.950, height = 0.950 },
+    },
   }
 
   Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
