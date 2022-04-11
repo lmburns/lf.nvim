@@ -16,7 +16,7 @@ local Config = {}
 --- Initialize the default configuration
 local function init()
   local lf = require("lf")
-  vim.validate({ config = { lf._config, "table", true } })
+  vim.validate({ Config = { lf._cfg, "table", true } })
 
   local opts = {
     default_cmd = "lf",
@@ -37,8 +37,8 @@ local function init()
     mappings = true,
   }
 
-  Config = vim.tbl_deep_extend("keep", lf._config or {}, opts)
-  lf._config = nil
+  Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
+  lf._cfg = nil
 end
 
 init()

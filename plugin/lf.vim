@@ -1,4 +1,4 @@
-command! -nargs=* -complete=file Lf lua require('lf').start(<f-args>)
+command! -nargs=* -complete=file Lfvim lua require('lf').start(<f-args>)
 
 " TODO: Finish this command
 " command! -nargs=* -complete=file LfToggle lua require('lf').setup():toggle(<f-args>)
