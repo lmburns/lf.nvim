@@ -24,10 +24,9 @@ local g = vim.g
 local map = utils.map
 
 ---Error for this program
-ERROR = nil
----Global running status
----I'm unsure of a way to keep an `Lf` variable constant through more than 1 `setup` calls
-g.__lf_running = false
+M.error = nil
+---Is `Lf` configured?
+M.loaded = nil
 
 local Config = require("lf.config")
 
@@ -35,12 +34,9 @@ local Config = require("lf.config")
 local Terminal = require("toggleterm.terminal").Terminal
 
 --- @class Lf
---- @field cmd string
---- @field direction string the layout style for the terminal
---- @field id number
---- @field window number
---- @field job_id number
---- @field highlights table<string, table<string, string>>
+--- @field cfg Config Configuration options
+--- @field cwd string Current working directory
+--- @field term Terminal Toggle terminal
 local Lf = {}
 
 local function setup_term()
@@ -72,49 +68,64 @@ end
 ---@param config 'table'
 ---@return Lf
 function Lf:new(config)
-  local cfg = Config:set(config):get()
   self.__index = self
 
-  self.cfg = cfg
+  if config then
+    self.cfg = Config:set(config):get()
+  else
+    self.cfg = Config
+  end
+
+  self.bufnr = nil
+
+  -- TODO: use or del
   self.cwd = uv.cwd()
 
   setup_term()
+  self:__create_term()
+
+  return self
+end
+
+---Create the toggle terminal
+function Lf:__create_term()
   self.term = Terminal:new(
       {
-        cmd = cfg.default_cmd,
-        dir = cfg.dir,
-        direction = cfg.direction,
-        winblend = cfg.winblend,
+        cmd = self.cfg.default_cmd,
+        dir = self.cfg.dir,
+        direction = self.cfg.direction,
+        winblend = self.cfg.winblend,
         close_on_exit = true,
 
         float_opts = {
-          border = cfg.border,
-          width = math.floor(vim.o.columns * cfg.width),
-          height = math.floor(vim.o.lines * cfg.height),
-          winblend = cfg.winblend,
+          border = self.cfg.border,
+          width = math.floor(vim.o.columns * self.cfg.width),
+          height = math.floor(vim.o.lines * self.cfg.height),
+          winblend = self.cfg.winblend,
           highlights = { border = "Normal", background = "Normal" },
         },
-
-        -- on_open = cfg.on_open,
-        -- on_close = nil,
       }
   )
-
-  return self
 end
 
 ---Start the underlying terminal
 ---@param path string path where lf starts (reads from config if none, else CWD)
 function Lf:start(path)
   self:__open_in(path or self.cfg.dir)
-  if ERROR ~= nil then
-    notify(ERROR, "error")
+  if M.error ~= nil then
+    notify(M.error, "error")
     return
   end
   self:__wrapper()
 
-  self.term.on_open = function(term)
-    self:__on_open(term)
+  if self.cfg.mappings then
+    self.term.on_open = function(term)
+      self:__on_open(term)
+    end
+  else
+    self.term.on_open = function(_)
+      self.bufnr = api.nvim_get_current_buf()
+    end
   end
 
   self.term.on_exit = function(term, _, _, _)
@@ -123,17 +134,16 @@ function Lf:start(path)
 
   -- NOTE: Maybe pcall here?
   self.term:toggle()
-  g.__lf_running = true
 end
 
+function M.print_active()
+  p(active)
+end
+
+---Toggle `Lf` on and off
+---@param path string
 function Lf:toggle(path)
-  print(g.__lf_running)
-  if g.__lf_running then
-    self.term:close()
-    g.__lf_running = false
-  else
-    self:start(path)
-  end
+  -- TODO:
 end
 
 ---@private
@@ -148,16 +158,18 @@ function Lf:__open_in(path)
           dir = require("lf.utils").git_dir()
         end
 
-        if dir then
+        if dir ~= "" then
           return fn.expand(dir)
         else
-          return self.cwd
+          -- `uv` lib doesn't switch directories
+          -- Expanding the filename works instead
+          return fn.expand("%:p")
         end
       end)(path)
   )
 
   if not path:exists() then
-    ERROR = ("directory doesn't exist: %s"):format(path)
+    M.error = ("directory doesn't exist: %s"):format(path)
     return
   end
 
@@ -189,6 +201,9 @@ end
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
+  -- api.nvim_command("setlocal filetype=lf")
+  M.loaded = true
+  self.bufnr = api.nvim_get_current_buf()
   for key, mapping in pairs(self.cfg.default_actions) do
     map(
         "t", key, function()
@@ -206,9 +221,16 @@ end
 function Lf:__callback(term)
   if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and
       uv.fs_stat(self.lastdir_tmp) then
-    local f = io.open(self.lastdir_tmp)
-    local last_dir = f:read()
-    f:close()
+
+    local with = require("plenary.context_manager").with
+    local open = require("plenary.context_manager").open
+
+    -- Since plenary is already being used, this is used instead of `io`
+    local last_dir = with(
+        open(self.lastdir_tmp), function(r)
+          return r:read()
+        end
+    )
 
     if last_dir ~= uv.cwd() then
       api.nvim_exec(("%s %s"):format(self.cfg.default_action, last_dir), true)

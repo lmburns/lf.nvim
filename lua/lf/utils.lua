@@ -58,6 +58,11 @@ M.git_dir = function()
   return vim.trim(gitdir)
 end
 
+---Create a neovim keybinding
+---@param mode string vim mode in a single letter
+---@param lhs string keys that are bound
+---@param rhs string string or lua function that is mapped to the keys
+---@param opts table options set for the mapping
 M.map = function(mode, lhs, rhs, opts)
   opts = opts or {}
   opts.noremap = opts.noremap == nil and true or opts.noremap
