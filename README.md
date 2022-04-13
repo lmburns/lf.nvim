@@ -103,23 +103,12 @@ require('lf').start("~/.config", { border = "rounded" }) -- opens in `~/.config`
 ```
 
 ### Default Actions
-The goal is to allow for these keybindings to be hijacked by `Lf` and make them execute the command
-as soon as the keybinding is pressed; however, I am unsure of a way to do this at the moment. If `lf` had a more
-programmable API that was similar to `ranger`'s, then something like [`rnvimr`](https://github.com/kevinhwang91/rnvimr)
-would be possible, which allows this.
-
-For the moment, these bindings are hijacked on the startup of `Lf`, and when they are pressed, a notification is sent
-that your default action has changed. When you go to open a file as you normally would, this command is ran instead
-of your `default_action`.
+These are various ways to open the wanted file(s). The process works by creating a Neovim mapping to send
+`lf` a command to manually open the file. The available commands is anything that can open a file.
 
 ### Resizing Window
-The configuration option `layout_mapping` is the keymapping that will cycle through the window `views`.
-The way it is setup now seems to work by resizing the window; however, the file manager is not center focused on each resize.
-If `lf` is used (i.e., `j` or `k`, etc. is pressed to move around) before the resize, the file manager seems to stay focused,
-until the last view is reached and the cycle starts back over. Once the cycle restarts the file manager is not center
-focused anymore.
-
-If anyone can get this to work, I would very much appreciate it.
+The configuration option `layout_mapping` is the key-mapping that will cycle through the window `views`.
+Once the last view is reached, the cycle is restarted.
 
 ### Neovim 0.7.0
 If you do not have the nightly version of `nvim`, then the `mappings` field can be set to false.
@@ -134,8 +123,7 @@ The only configurable environment variable is `g:lf_replace_netrw`, which can be
 
 ### TODO
 - [ ] `:LfToggle` command
-- [ ] Find a way for `lf` to hijack keybindings
-  - This may have to be done by writing to the user's configuration file
-  - It would involve mapping each `default_actions` key to the `open` command, which closes the file manager
-  - Once the file manager was closed, these would need to be removed
+- [x] Find a way for `lf` to hijack keybindings
 - [x] Cycling through various sizes of the terminal (similar to `rnvimr`)
+- [ ] Save previous size when terminal is closed, so it is restored on open
+- [ ] Set `tmux` title of ToggleTerm
