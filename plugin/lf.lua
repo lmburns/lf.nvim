@@ -6,8 +6,8 @@ local debounce = require("lf.debounce")
 
 api.nvim_create_user_command(
     "Lf",
-    function(fargs)
-        require("lf").start(fargs)
+    function(tbl)
+        require("lf").start(tbl.args)
     end,
     {nargs = "*", complete = "file"}
 )
