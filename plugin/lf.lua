@@ -2,7 +2,6 @@ local M = {}
 
 local api = vim.api
 local uv = vim.loop
-local debounce = require("lf.debounce")
 
 api.nvim_create_user_command(
     "Lf",
@@ -21,43 +20,45 @@ if g.lf_replace_netrw then
         {
             pattern = "*",
             group = group,
-            command = [[sil! au! FileExplorer]]
+            once = true,
+            callback = function()
+                if fn.exists("#FileExplorer") then
+                    vim.cmd("sil! au! FileExplorer")
+                end
+            end
         }
     )
 
-    -- api.nvim_create_autocmd(
-    --     "BufEnter",
-    --     {
-    --         pattern = "*",
-    --         group = group,
-    --         callback = function()
-    --             local path = Path:new(fn.expand("%"))
-    --             if path:is_dir() then
-    --                 vim.cmd("bdelete!")
-    --
-    --                 -- local timer = uv.new_timer()
-    --                 -- timer:start(
-    --                 --     100,
-    --                 --     0,
-    --                 --     vim.schedule_wrap(
-    --                 --         function()
-    --                 --             -- p(path:absolute())
-    --                 --             require("lf").start(path:absolute())
-    --                 --         end
-    --                 --     )
-    --                 -- )
-    --
-    --                 vim.defer_fn(
-    --                     function()
-    --                         p(path:absolute())
-    --                         -- require("lf").start(path:absolute())
-    --                     end,
-    --                     100
-    --                 )
-    --             end
-    --         end
-    --     }
-    -- )
+    api.nvim_create_autocmd(
+        "BufEnter",
+        {
+            pattern = "*",
+            group = group,
+            -- I don't know if this is supposed to be once
+            -- The file manager only needs to be opened once, but it could be handled differently
+            once = true,
+            callback = function()
+                local path = Path:new(fn.expand("%"))
+                if path:is_dir() then
+                    local bufnr = fn.bufnr()
+                    vim.cmd(("sil! bwipeout %d"):format(bufnr))
+
+                    local timer = uv.new_timer()
+                    timer:start(
+                        100,
+                        0,
+                        vim.schedule_wrap(
+                            function()
+                                timer:stop()
+                                timer:close()
+                                require("lf").start(path:absolute())
+                            end
+                        )
+                    )
+                end
+            end
+        }
+    )
 end
 
 return M
