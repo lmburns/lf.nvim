@@ -1,18 +1,23 @@
 --- @class Config
---- @field default_cmd string default `lf` command
---- @field default_action string default action when `Lf` opens a file
---- @field default_actions table default action keybindings
---- @field winblend number psuedotransparency level
---- @field dir string directory where `lf` starts ('gwd' is git-working-directory)
---- @field direction string window type: float horizontal vertical
---- @field border string border kind: single double shadow curved
---- @field height number height of the *floating* window
---- @field width number width of the *floating* window
---- @field mappings boolean whether terminal buffer mappings should be set
+--- @field default_cmd string: default `lf` command
+--- @field default_action string: default action when `Lf` opens a file
+--- @field default_actions table: default action keybindings
+--- @field winblend number: psuedotransparency level
+--- @field dir string: directory where `lf` starts ('gwd' is git-working-directory, "" is CWD)
+--- @field direction string: window type: float horizontal vertical
+--- @field border string: border kind: single double shadow curved
+--- @field height number: height of the *floating* window
+--- @field width number: width of the *floating* window
+--- @field mappings boolean: whether terminal buffer mappings should be set
+--- @field tmux boolean: whether tmux statusline should be changed by this plugin
+--- @field highlights table: highlight table to pass to `toggleterm`
+--- @field layout_mapping string: keybinding to rotate through the window layouts
+--- @field views table: table of layouts to be applied to `nvim_win_set_config`
 local Config = {}
 
 local fn = vim.fn
 local o = vim.o
+local F = vim.F
 
 -- A local function that runs each time allows for a global `.setup()` to work
 
@@ -37,6 +42,8 @@ local function init()
         height = 0.80,
         width = 0.85,
         mappings = true,
+        tmux = true,
+        highlights = {},
         -- Layout configurations
         layout_mapping = "<A-u>",
         views = {
@@ -47,7 +54,7 @@ local function init()
             },
             {width = 0.800, height = 0.800},
             {width = 0.950, height = 0.950}
-        }
+        },
     }
 
     Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
@@ -59,17 +66,17 @@ init()
 local notify = require("lf.utils").notify
 
 ---Verify that configuration options that are numbers are numbers or can be converted to numbers
----@param field string `Config` field to check
-function Config:__check_number(field)
+---@param field string | number: `Config` field to check
+---@param default number: Default value to return if the conversion failed
+function Config:__check_number(field, default)
     if type(field) == "string" then
         local res = tonumber(field)
-        if res == nil then
-            notify(("invalid option for winblend: %s"):format(field))
-            return self.winblend
-        else
-            return res
-        end
+        return F.if_nil(res, default)
+    elseif type(field) == "number" then
+        return field
     end
+
+    return default
 end
 
 ---Set a configuration passed as a function argument (not through `setup`)
@@ -77,9 +84,10 @@ end
 ---@return Config
 function Config:set(cfg)
     if cfg and type(cfg) == "table" then
-        cfg.winblend = self:__check_number(cfg.winblend)
-        cfg.height = self:__check_number(cfg.height)
-        cfg.width = self:__check_number(cfg.width)
+        -- TODO: Maybe verify more options in configuration?
+        cfg.winblend = self:__check_number(cfg.winblend, self.winblend)
+        cfg.height = self:__check_number(cfg.height, self.height)
+        cfg.width = self:__check_number(cfg.width, self.width)
 
         self = vim.tbl_deep_extend("force", self, cfg or {})
     end

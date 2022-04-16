@@ -20,15 +20,34 @@ require("lf").setup({
   },
 
   winblend = 10, -- psuedotransparency level
-  dir = "", -- directory where `lf` starts ('gwd' is git-working-directory)
+  dir = "", -- directory where `lf` starts ('gwd' is git-working-directory, "" is CWD)
   direction = "float", -- window type: float horizontal vertical
   border = "double", -- border kind: single double shadow curved
   height = 0.80, -- height of the *floating* window
   width = 0.85, -- width of the *floating* window
   mappings = true, -- whether terminal buffer mapping is enabled
+  tmux = false, -- tmux statusline can be disabled on opening of Lf
+  highlights = { -- highlights passed to toggleterm
+    Normal = { guibg = <VALUE> },
+    NormalFloat = { link = 'Normal' },
+    FloatBorder = {
+      guifg = <VALUE>,
+      guibg = <VALUE>
+    }
+  },
 
-  ...
-  ...
+  -- Layout configurations
+  layout_mapping = "<A-u>", -- resize window with this key
+
+  views = { -- window dimensions to rotate through
+    { width = 0.600, height = 0.600 },
+    {
+      width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
+      height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines,
+    },
+    { width = 0.800, height = 0.800 },
+    { width = 0.950, height = 0.950 },
+  }
 })
 
 vim.api.nvim_set_keymap("n", "<mapping>", "<cmd>lua require('lf').start()", { noremap = true })
@@ -46,35 +65,13 @@ vim.keymap.set(
       -- nil, -- this is the path to open Lf (nil means CWD)
               -- this argument is optional see `.start` below
       {
-        default_cmd = "lf", -- default `lf` command
-        default_action = "edit", -- default action when `Lf` opens a file
-        default_actions = { -- default action keybindings
-          ["<C-t>"] = "tabedit",
-          ["<C-x>"] = "split",
-          ["<C-v>"] = "vsplit",
-          ["<C-o>"] = "tab drop",
-        },
-
-        winblend = 10, -- psuedotransparency level
+        -- Pass any options (if any) that you would like
         dir = "", -- directory where `lf` starts ('gwd' is git-working-directory)
         direction = "float", -- window type: float horizontal vertical
         border = "double", -- border kind: single double shadow curved
         height = 0.80, -- height of the *floating* window
         width = 0.85, -- width of the *floating* window
         mappings = true, -- whether terminal buffer mapping is enabled
-
-        -- Layout configurations
-        layout_mapping = "<A-u>", -- resize window with this key
-
-        views = { -- window dimensions
-          { width = 0.600, height = 0.600 },
-          {
-            width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
-            height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines,
-          },
-          { width = 0.800, height = 0.800 },
-          { width = 0.950, height = 0.950 },
-        },
     })
   end,
   { noremap = true }
@@ -102,9 +99,16 @@ require('lf').start() -- opens in CWD with either `.setup()` or default options
 require('lf').start("~/.config", { border = "rounded" }) -- opens in `~/.config` with rounded borders
 ```
 
+### Highlighting Groups
+The highlight groups that I know for sure work are the ones mentioned above (`Normal`, `NormalFloat`, `FloatBorder`). These are passed to `toggleterm`, and there is a plan in the future to make these `Lf`'s own groups. For now, a one-shot way to change the color of the border of the terminal is the following:
+
+```
+:lua require("lf").start({ highlights = { FloatBorder = { guifg = "#819C3B" } } })
+```
+
 ### Default Actions
 These are various ways to open the wanted file(s). The process works by creating a Neovim mapping to send
-`lf` a command to manually open the file. The available commands is anything that can open a file.
+`lf` a command to manually open the file. The available commands are anything that can open a file.
 
 ### Resizing Window
 The configuration option `layout_mapping` is the key-mapping that will cycle through the window `views`.
@@ -125,5 +129,6 @@ The only configurable environment variable is `g:lf_replace_netrw`, which can be
 - [ ] `:LfToggle` command
 - [x] Find a way for `lf` to hijack keybindings
 - [x] Cycling through various sizes of the terminal (similar to `rnvimr`)
+- [x] Set `tmux` title of ToggleTerm
 - [ ] Save previous size when terminal is closed, so it is restored on open
-- [ ] Set `tmux` title of ToggleTerm
+- [ ] Maybe: Disable `lualine` and other status lines

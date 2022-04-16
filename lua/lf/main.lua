@@ -44,7 +44,8 @@ local Terminal = require("toggleterm.terminal").Terminal
 --- @field id_tmp string File path to a file containing `lf`'s id
 local Lf = {}
 
-local function setup_term()
+local function setup_term(highlights)
+    vim.validate({highlights = {highlights, "table", true}})
     terminal.setup(
         {
             size = function(term)
@@ -60,8 +61,8 @@ local function setup_term()
             shading_factor = "1",
             start_in_insert = true,
             insert_mappings = true,
-            persist_size = true
-            -- open_mapping = [[<c-\>]],
+            persist_size = true,
+            highlights = highlights
         }
     )
 end
@@ -85,7 +86,7 @@ function Lf:new(config)
     self.winid = nil
     self.id_tmp = nil
 
-    setup_term()
+    setup_term(self.cfg.highlights)
     self:__create_term()
 
     return self
@@ -105,8 +106,8 @@ function Lf:__create_term()
                 border = self.cfg.border,
                 width = math.floor(vim.o.columns * self.cfg.width),
                 height = math.floor(vim.o.lines * self.cfg.height),
-                winblend = self.cfg.winblend,
-                highlights = {border = "Normal", background = "Normal"}
+                winblend = self.cfg.winblend
+                -- highlights = {border = "Normal", background = "Normal"},
             }
         }
     )
@@ -163,8 +164,7 @@ function Lf:__open_in(path)
             if dir ~= "" then
                 return fn.expand(dir)
             else
-                -- `uv` lib doesn't switch directories
-                -- Expanding the filename works instead
+                -- Base the CWD on the filename and not `lcd` and such
                 return fn.expand("%:p")
             end
         end)(path)
@@ -213,6 +213,10 @@ end
 function Lf:__on_open(term)
     -- api.nvim_command("setlocal filetype=lf")
 
+    if self.cfg.tmux then
+        utils.tmux(true)
+    end
+
     for key, mapping in pairs(self.cfg.default_actions) do
         map(
             "t",
@@ -245,6 +249,7 @@ function Lf:__on_open(term)
 
     if self.cfg.layout_mapping then
         self.winid = api.nvim_get_current_win()
+        -- Wrap needs to be set, otherwise the window isn't aligned on resize
         api.nvim_win_set_option(self.winid, "wrap", true)
 
         map(
@@ -263,6 +268,10 @@ end
 ---
 ---@param term Terminal
 function Lf:__callback(term)
+    if self.cfg.tmux then
+        utils.tmux(false)
+    end
+
     if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and uv.fs_stat(self.lastdir_tmp) then
         -- Since plenary is already being used, this is used instead of `io`
         local last_dir =

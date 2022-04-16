@@ -11,7 +11,7 @@ api.nvim_create_user_command(
     {nargs = "*", complete = "file"}
 )
 
-if g.lf_replace_netrw then
+if g.lf_replace_netrw == 1 then
     local Path = require("plenary.path")
     local group = api.nvim_create_augroup("ReplaceNetrwWithLf", {clear = true})
 
@@ -23,7 +23,7 @@ if g.lf_replace_netrw then
             once = true,
             callback = function()
                 if fn.exists("#FileExplorer") then
-                    vim.cmd("sil! au! FileExplorer")
+                    vim.cmd("silent! autocmd! FileExplorer")
                 end
             end
         }
@@ -34,8 +34,6 @@ if g.lf_replace_netrw then
         {
             pattern = "*",
             group = group,
-            -- I don't know if this is supposed to be once
-            -- The file manager only needs to be opened once, but it could be handled differently
             once = true,
             callback = function()
                 local path = Path:new(fn.expand("%"))
