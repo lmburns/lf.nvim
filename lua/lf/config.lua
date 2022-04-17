@@ -42,7 +42,7 @@ local function init()
         height = 0.80,
         width = 0.85,
         mappings = true,
-        tmux = true,
+        tmux = false,
         highlights = {},
         -- Layout configurations
         layout_mapping = "<A-u>",

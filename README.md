@@ -99,10 +99,10 @@ require('lf').start() -- opens in CWD with either `.setup()` or default options
 require('lf').start("~/.config", { border = "rounded" }) -- opens in `~/.config` with rounded borders
 ```
 
-### Highlighting Groups
+### Highlight Groups
 The highlight groups that I know for sure work are the ones mentioned above (`Normal`, `NormalFloat`, `FloatBorder`). These are passed to `toggleterm`, and there is a plan in the future to make these `Lf`'s own groups. For now, a one-shot way to change the color of the border of the terminal is the following:
 
-```
+```vim
 :lua require("lf").start({ highlights = { FloatBorder = { guifg = "#819C3B" } } })
 ```
 
@@ -124,6 +124,17 @@ require("lf").start({ mappings = false })
 
 ### Replacing Netrw
 The only configurable environment variable is `g:lf_replace_netrw`, which can be set to `1` to replace `netrw`
+
+### Key mappings
+The mappings that are listed in the `setup` call above are the default bindings.
+
+* `<C-t>` = `tabedit`
+* `<C-x>` = `split`
+* `<C-v>` = `vsplit`
+* `<C-o>` = `tab drop`
+* `<A-u>` = resize the floating window
+
+A suggested binding to use to open `Lf` is `<C-o>` or `<A-o>`.
 
 ### TODO
 - [ ] `:LfToggle` command
