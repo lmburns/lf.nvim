@@ -11,7 +11,7 @@ api.nvim_create_user_command(
     {nargs = "*", complete = "file"}
 )
 
-if g.lf_replace_netrw == 1 then
+if g.lf_netrw == 1 then
     local Path = require("plenary.path")
     local group = api.nvim_create_augroup("ReplaceNetrwWithLf", {clear = true})
 
@@ -37,7 +37,7 @@ if g.lf_replace_netrw == 1 then
             once = true,
             callback = function()
                 local path = Path:new(fn.expand("%"))
-                if path:is_dir() then
+                if path:is_dir() and fn.argc() ~= 0  then
                     local bufnr = fn.bufnr()
                     vim.cmd(("sil! bwipeout %d"):format(bufnr))
 

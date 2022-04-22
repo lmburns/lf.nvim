@@ -123,7 +123,7 @@ require("lf").start({ mappings = false })
 ```
 
 ### Replacing Netrw
-The only configurable environment variable is `g:lf_replace_netrw`, which can be set to `1` to replace `netrw`
+The only configurable environment variable is `g:lf_netrw`, which can be set to `1` to replace `netrw`
 
 ### Key mappings
 The mappings that are listed in the `setup` call above are the default bindings.

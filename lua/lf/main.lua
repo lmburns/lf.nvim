@@ -106,8 +106,8 @@ function Lf:__create_term()
                 border = self.cfg.border,
                 width = math.floor(vim.o.columns * self.cfg.width),
                 height = math.floor(vim.o.lines * self.cfg.height),
-                winblend = self.cfg.winblend
-                -- highlights = {border = "Normal", background = "Normal"},
+                winblend = self.cfg.winblend,
+                highlights = {border = "Normal", background = "Normal"},
             }
         }
     )
@@ -170,10 +170,10 @@ function Lf:__open_in(path)
         end)(path)
     )
 
-    if not path:exists() then
-        M.error = ("directory doesn't exist: %s"):format(path)
-        return
-    end
+    -- if not path:exists() then
+    --     M.error = ("directory doesn't exist: %s"):format(path)
+    --     return
+    -- end
 
     -- Should be fine, but just checking
     if not path:is_dir() then
