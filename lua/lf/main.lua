@@ -107,7 +107,7 @@ function Lf:__create_term()
                 width = math.floor(vim.o.columns * self.cfg.width),
                 height = math.floor(vim.o.lines * self.cfg.height),
                 winblend = self.cfg.winblend,
-                highlights = {border = "Normal", background = "Normal"},
+                highlights = {border = "Normal", background = "Normal"}
             }
         }
     )
@@ -170,10 +170,11 @@ function Lf:__open_in(path)
         end)(path)
     )
 
-    -- if not path:exists() then
-    --     M.error = ("directory doesn't exist: %s"):format(path)
-    --     return
-    -- end
+    if not path:exists() then
+        utils.info("Current file doesn't exist")
+        -- M.error = ("directory doesn't exist: %s"):format(path)
+        -- return
+    end
 
     -- Should be fine, but just checking
     if not path:is_dir() then
@@ -215,6 +216,10 @@ function Lf:__on_open(term)
 
     if self.cfg.tmux then
         utils.tmux(true)
+    end
+
+    if self.cfg.escape_quit then
+        map("t", "<Esc>", "q", {buffer = term.bufnr})
     end
 
     for key, mapping in pairs(self.cfg.default_actions) do

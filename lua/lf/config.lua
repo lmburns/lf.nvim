@@ -8,6 +8,7 @@
 --- @field border string: border kind: single double shadow curved
 --- @field height number: height of the *floating* window
 --- @field width number: width of the *floating* window
+--- @field escape_quit boolean: whether escape should be mapped to quit
 --- @field mappings boolean: whether terminal buffer mappings should be set
 --- @field tmux boolean: whether tmux statusline should be changed by this plugin
 --- @field highlights table: highlight table to pass to `toggleterm`
@@ -41,6 +42,7 @@ local function init()
         border = "double",
         height = 0.80,
         width = 0.85,
+        escape_quit = true,
         mappings = true,
         tmux = false,
         highlights = {},
@@ -63,7 +65,7 @@ end
 
 init()
 
-local notify = require("lf.utils").notify
+-- local notify = require("lf.utils").notify
 
 ---Verify that configuration options that are numbers are numbers or can be converted to numbers
 ---@param field string | number: `Config` field to check
