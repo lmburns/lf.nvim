@@ -1,28 +1,23 @@
 local M = {}
 local loaded = false
 
-local function has_feature(cfg)
-  if not vim.keymap or not vim.keymap.set then
-    local function print_err()
-      require("lf.utils").notify(
-          "lf.nvim mappings require Neovim 0.7.0 or higher", "error"
-      )
-    end
+local utils = require("lf.utils")
 
-    print_err()
-    cfg.mappings = false
-    -- Lf["__on_open"] = print_err
-  end
+local function has_feature(cfg)
+    if not vim.keymap or not vim.keymap.set then
+        utils.notify("lf.nvim mappings require Neovim 0.7.0 or higher", "error")
+        cfg.mappings = false
+    end
 end
 
 function M.setup(cfg)
-  if loaded then
-    return
-  end
+    if loaded then
+        return
+    end
 
-  has_feature(cfg)
-  M._cfg = cfg or {}
-  loaded = true
+    has_feature(cfg)
+    M._cfg = cfg or {}
+    loaded = true
 end
 
 ---Start the file manager
@@ -30,13 +25,21 @@ end
 ---
 ---@param path string optional path to start in
 function M.start(path, cfg)
-  -- Only one argument was given
-  if path and cfg == nil and type(path) == "table" then
-    require("lf.main").Lf:new(path or M._cfg):start(nil)
-  else
-    require("lf.main").Lf:new(cfg or M._cfg):start(path)
-  end
+    -- Only one argument was given
+    if path and cfg == nil and type(path) == "table" then
+        require("lf.main").Lf:new(path or M._cfg):start(nil)
+    else
+        if cfg ~= nil and type(path) ~= "string" then
+            utils.notify("first argument must be a string", "error")
+            return
+        end
+        if cfg ~= nil and type(cfg) ~= "table" then
+            utils.notify("second argument must be a table", "error")
+            return
+        end
 
+        require("lf.main").Lf:new(cfg or M._cfg):start(path)
+    end
 end
 
 return M
