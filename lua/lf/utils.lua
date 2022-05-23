@@ -38,6 +38,7 @@ end
 ---@param msg string
 ---@param level 'error' | 'info' | 'warn'
 M.notify = function(msg, level)
+    ---@diagnostic disable-next-line: undefined-field
     level = level and levels[level:upper()] or levels.INFO
     vim.notify(fmt("[lf]: %s", msg), level)
 end
@@ -45,7 +46,8 @@ end
 ---Helper function to derive the current git directory path
 ---@return string|nil
 M.git_dir = function()
-    local gitdir = fn.system(fmt("git -C %s rev-parse --show-toplevel", fn.expand("%:p:h")))
+    ---@diagnostic disable-next-line: missing-parameter
+    local gitdir = fn.system(("git -C %s rev-parse --show-toplevel"):format(fn.expand("%:p:h")))
 
     local isgitdir = fn.matchstr(gitdir, "^fatal:.*") == ""
     if not isgitdir then
@@ -58,11 +60,21 @@ end
 ---@param mode string vim mode in a single letter
 ---@param lhs string keys that are bound
 ---@param rhs string string or lua function that is mapped to the keys
----@param opts table options set for the mapping
+---@param opts table? options set for the mapping
 M.map = function(mode, lhs, rhs, opts)
     opts = opts or {}
     opts.noremap = opts.noremap == nil and true or opts.noremap
     vim.keymap.set(mode, lhs, rhs, opts)
+
+    local ok, wk = pcall(require, "which-key")
+    if ok and opts.desc then
+        wk.register(
+            {
+                [lhs] = {opts.desc}
+            },
+            {mode = mode}
+        )
+    end
 end
 
 ---Set the tmux statusline when opening/closing `Lf`

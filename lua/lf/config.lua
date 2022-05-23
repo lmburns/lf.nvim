@@ -98,7 +98,7 @@ function Config:set(cfg)
 end
 
 ---Get the entire configuration if empty, else get the given key
----@param key string option to get
+---@param key string? option to get
 ---@return Config
 function Config:get(key)
     if key then

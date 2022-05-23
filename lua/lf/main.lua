@@ -149,9 +149,9 @@ end
 
 ---Toggle `Lf` on and off
 ---@param path string
-function Lf:toggle(path)
-    -- TODO:
-end
+-- function Lf:toggle(path)
+--     -- TODO:
+-- end
 
 ---@private
 ---Set the directory for `Lf` to open in
@@ -224,7 +224,7 @@ function Lf:__on_open(term)
     end
 
     if self.cfg.escape_quit then
-        map("t", "<Esc>", "q", {buffer = term.bufnr})
+        map("t", "<Esc>", "q", {buffer = term.bufnr, desc = "Exit Lf"})
     end
 
     for key, mapping in pairs(self.cfg.default_actions) do
@@ -253,7 +253,7 @@ function Lf:__on_open(term)
                     }
                 ):sync()
             end,
-            {noremap = true, buffer = term.bufnr}
+            {noremap = true, buffer = term.bufnr, desc = ("Lf %s"):format(mapping)}
         )
     end
 
