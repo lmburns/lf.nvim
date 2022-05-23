@@ -6,10 +6,11 @@ end
 
 local api = vim.api
 local fn = vim.fn
+
 _G.loaded_lf = 1
 
 api.nvim_create_user_command(
-    "Lfnvim",
+    "Lf",
     function(tbl)
         require("lf").start(tbl.args)
     end,
@@ -71,5 +72,20 @@ if vim.g.lf_netrw == 1 then
         }
     )
 end
+
+--  TODO: Finish this command
+--  command! -nargs=* -complete=file LfToggle lua require('lf').setup():toggle(<f-args>)
+--
+-- cmd [[
+--  if exists('g:lf_replace_netrw') && g:lf_replace_netrw
+--    augroup ReplaceNetrwWithLf
+--      autocmd VimEnter * silent! autocmd! FileExplorer
+--      autocmd BufEnter * let s:buf_path = expand("%")
+--            \ | if isdirectory(s:buf_path)
+--            \ | call timer_start(100, v:lua.require'lf'.start(s:buf_path))
+--            \ | endif
+--    augroup END
+--  endif
+-- ]]
 
 return M
