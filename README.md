@@ -51,7 +51,7 @@ require("lf").setup({
   }
 })
 
-vim.api.nvim_set_keymap("n", "<mapping>", "<cmd>lua require('lf').start()", { noremap = true })
+vim.api.nvim_set_keymap("n", "<mapping>", "<cmd>lua require('lf').start()<CR>", { noremap = true })
 ```
 
 Another option is to use `vim.keymap.set`, which requires `nvim` 0.7.0 or higher. This doesn't require local
@@ -109,7 +109,8 @@ The highlight groups that I know for sure work are the ones mentioned above (`No
 
 ### Default Actions
 These are various ways to open the wanted file(s). The process works by creating a Neovim mapping to send
-`lf` a command to manually open the file. The available commands are anything that can open a file.
+`lf` a command to manually open the file. The available commands are anything that can open a file in Vim.
+See `tabpage.txt` and `windows.txt`
 
 ### Resizing Window
 The configuration option `layout_mapping` is the key-mapping that will cycle through the window `views`.
@@ -117,7 +118,7 @@ Once the last view is reached, the cycle is restarted.
 
 ### Neovim 0.7.0
 If you do not have the nightly version of `nvim`, then the `mappings` field can be set to false.
-Otherwise, a notification will be display saying that you are not allowed to use these.
+Otherwise, a notification will be displayed saying that you are not allowed to use them.
 
 ```lua
 require("lf").start({ mappings = false })
@@ -132,15 +133,10 @@ The mappings that are listed in the `setup` call above are the default bindings.
 * `<C-t>` = `tabedit`
 * `<C-x>` = `split`
 * `<C-v>` = `vsplit`
-* `<C-o>` = `tab drop`
+* `<C-o>` = `tab drop` (`<A-o>` is also suggested)
 * `<A-u>` = resize the floating window
-
-A suggested binding to use to open `Lf` is `<C-o>` or `<A-o>`.
 
 ### TODO
 - [ ] `:LfToggle` command
-- [x] Find a way for `lf` to hijack keybindings
-- [x] Cycling through various sizes of the terminal (similar to `rnvimr`)
-- [x] Set `tmux` title of ToggleTerm
 - [ ] Save previous size when terminal is closed, so it is restored on open
-- [ ] Maybe: Disable `lualine` and other status lines
+- [ ] Set Lualine to `Lf` title

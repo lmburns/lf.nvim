@@ -53,20 +53,6 @@ if vim.g.lf_netrw == 1 then
                         end,
                         100
                     )
-
-                -- This is identical to the function above
-                -- local timer = uv.new_timer()
-                -- timer:start(
-                --     100,
-                --     0,
-                --     vim.schedule_wrap(
-                --         function()
-                --             -- timer:stop()
-                --             timer:close()
-                --             require("lf").start(path:absolute())
-                --         end
-                --     )
-                -- )
                 end
             end
         }

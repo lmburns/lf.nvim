@@ -4,7 +4,6 @@ local M = {}
 
 local fn = vim.fn
 local api = vim.api
-local fmt = string.format
 local levels = vim.log.levels
 
 ---Echo a message with `nvim_echo`
@@ -40,7 +39,7 @@ end
 M.notify = function(msg, level)
     ---@diagnostic disable-next-line: undefined-field
     level = level and levels[level:upper()] or levels.INFO
-    vim.notify(fmt("[lf]: %s", msg), level)
+    vim.notify(("[lf]: %s"):format(msg), level)
 end
 
 ---Helper function to derive the current git directory path
@@ -70,7 +69,7 @@ M.map = function(mode, lhs, rhs, opts)
     if ok and opts.desc then
         wk.register(
             {
-                [lhs] = {opts.desc}
+                [lhs] = opts.desc
             },
             {mode = mode}
         )
