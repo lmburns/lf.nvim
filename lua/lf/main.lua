@@ -224,7 +224,7 @@ function Lf:__on_open(term)
     end
 
     if self.cfg.escape_quit then
-        map("t", "<Esc>", "q", {buffer = term.bufnr, desc = "Exit Lf"})
+        map("t", "<Esc>", "<Cmd>q<CR>", {buffer = term.bufnr, desc = "Exit Lf"})
     end
 
     for key, mapping in pairs(self.cfg.default_actions) do
