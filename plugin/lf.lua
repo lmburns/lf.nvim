@@ -17,7 +17,7 @@ api.nvim_create_user_command(
     {nargs = "*", complete = "file"}
 )
 
-if vim.g.lf_netrw == 1 then
+if vim.g.lf_netrw == 1 or vim.g.lf_netrw then
     local Path = require("plenary.path")
     local group = api.nvim_create_augroup("ReplaceNetrwWithLf", {clear = true})
 
