@@ -5,6 +5,34 @@ It is very similar to [`lf.vim`](https://github.com/ptzz/lf.vim), except for tha
 
 **NOTE**: This plugin uses [`toggleterm.nvim`](https://github.com/akinsho/toggleterm.nvim) and [`plenary.nvim`](https://github.com/nvim-lua/plenary.nvim)
 
+### Installation
+```lua
+-- Sample configuration is supplied
+use(
+    {
+        "lmburns/lf.nvim",
+        config = function()
+          -- This feature will not work if the plugin is lazy-loaded
+          vim.g.lf_netrw = 1
+
+          require("lf").setup(
+              {
+                  escape_quit = false,
+                  border = "rounded",
+                  highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
+              }
+          )
+
+          vim.keymap.set("n", "<C-o>", ":Lf<CR>")
+        end,
+        requires = {
+            "plenary.nvim",
+            "toggleterm.nvim"
+        }
+    }
+)
+```
+
 ### Setup/Configuration
 
 ```lua
@@ -125,7 +153,7 @@ require("lf").start({ mappings = false })
 ```
 
 ### Replacing Netrw
-The only configurable environment variable is `g:lf_netrw`, which can be set to `1` to replace `netrw`
+The only configurable environment variable is `g:lf_netrw`, which can be set to `1` or `true` to replace `netrw`
 
 ### Key mappings
 The mappings that are listed in the `setup` call above are the default bindings.
