@@ -222,7 +222,7 @@ end
 ---@param term Terminal
 function Lf:__on_open(term)
     self.bufnr = api.nvim_get_current_buf()
-    api.nvim_buf_set_option(self.bufnr, "filetype", "lf")
+    api.nvim_buf_set_option(self.bufnr, "filetype", "lf_term")
 
     if self.cfg.tmux then
         utils.tmux(true)
