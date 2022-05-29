@@ -222,7 +222,11 @@ end
 ---@param term Terminal
 function Lf:__on_open(term)
     self.bufnr = api.nvim_get_current_buf()
+    -- TODO: Find a way to set custom filetype
     -- api.nvim_buf_set_option(self.bufnr, "filetype", "lf_term")
+
+    -- For now, use a global variable that can act as a filetype
+    vim.g.inside_lf = true
 
     if self.cfg.tmux then
         utils.tmux(true)
@@ -318,6 +322,8 @@ function Lf:__callback(term)
     if self.cfg.tmux then
         utils.tmux(false)
     end
+
+    vim.g.inside_lf = false
 
     if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and uv.fs_stat(self.lastdir_tmpfile) then
         -- Since plenary is already being used, this is used instead of `io`

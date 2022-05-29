@@ -1,6 +1,9 @@
 local M = {}
 local loaded = false
 
+-- Global variable that acts as a 'filetype' sort of deal, until a custom filetype can be set
+vim.g.inside_lf = false
+
 local utils = require("lf.utils")
 
 local function has_feature(cfg)
