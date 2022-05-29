@@ -30,6 +30,7 @@ local Job = require("plenary.job")
 local Config = require("lf.config")
 local with = require("plenary.context_manager").with
 local open = require("plenary.context_manager").open
+local a = require("plenary.async_lib")
 
 --- @class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
@@ -39,9 +40,11 @@ local Terminal = require("toggleterm.terminal").Terminal
 --- @field term Terminal Toggle terminal
 --- @field view_idx number Current index of configuration `views`
 --- @field winid number `Terminal` window id
---- @field lf_tmp string File path with the files to open with `lf`
---- @field lastdir_tmp string File path with the last directory `lf` was in
---- @field id_tmp string File path to a file containing `lf`'s id
+--- @field lf_tmpfile string File path with the files to open with `lf`
+--- @field lastdir_tmpfile string File path with the last directory `lf` was in
+--- @field id_tmpfile string File path to a file containing `lf`'s id
+--- @field id number Current Lf session id
+--- @field curr_file string|nil File path to the currently opened file
 --- @field bufnr number The open file's buffer number
 --- @field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
@@ -52,9 +55,9 @@ local function setup_term(highlights)
         {
             size = function(term)
                 if term.direction == "horizontal" then
-                    return vim.o.lines * 0.4
+                    return o.lines * 0.4
                 elseif term.direction == "vertical" then
-                    return vim.o.columns * 0.5
+                    return o.columns * 0.5
                 end
             end,
             hide_numbers = true,
@@ -86,9 +89,11 @@ function Lf:new(config)
 
     self.view_idx = 1
     self.winid = nil
-    self.id_tmp = nil
+    self.id_tmpfile = nil
+    self.id = nil
+    self.curr_file = nil
     self.bufnr = api.nvim_get_current_buf()
-    -- Needed to be grabbed here before the terminal buffer is created
+    -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
 
     setup_term(self.cfg.highlights)
@@ -109,8 +114,8 @@ function Lf:__create_term()
             close_on_exit = true,
             float_opts = {
                 border = self.cfg.border,
-                width = math.floor(vim.o.columns * self.cfg.width),
-                height = math.floor(vim.o.lines * self.cfg.height),
+                width = math.floor(o.columns * self.cfg.width),
+                height = math.floor(o.lines * self.cfg.height),
                 winblend = self.cfg.winblend,
                 highlights = {border = "Normal", background = "Normal"}
             }
@@ -143,7 +148,6 @@ function Lf:start(path)
         self:__callback(term)
     end
 
-    -- NOTE: Maybe pcall here?
     self.term:toggle()
 end
 
@@ -187,6 +191,7 @@ function Lf:__open_in(path)
     end
 
     self.term.dir = path:absolute()
+    self.curr_file = fn.expand("%:p")
 
     return self
 end
@@ -196,24 +201,23 @@ end
 ---
 ---@return Lf
 function Lf:__wrapper()
-    self.lf_tmp = os.tmpname()
-    self.lastdir_tmp = os.tmpname()
-    self.id_tmp = os.tmpname()
+    self.lf_tmpfile = os.tmpname()
+    self.lastdir_tmpfile = os.tmpname()
+    self.id_tmpfile = os.tmpname()
 
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
 
     self.term.cmd =
         ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]]):format(
         self.term.cmd,
-        self.id_tmp,
-        self.lastdir_tmp,
-        self.lf_tmp,
+        self.id_tmpfile,
+        self.lastdir_tmpfile,
+        self.lf_tmpfile,
         self.term.dir
     )
     return self
 end
 
--- TODO: Figure out a way to open the file with these commands
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
@@ -227,6 +231,30 @@ function Lf:__on_open(term)
         map("t", "<Esc>", "<Cmd>q<CR>", {buffer = term.bufnr, desc = "Exit Lf"})
     end
 
+    -- This will not work without deferring the function
+    -- If the module is reloaded via plenary, then re-required and ran it will work
+    -- However, if the :Lf command is used, reading the value provides a nil value
+    vim.defer_fn(
+        function()
+            if self.cfg.focus_on_open and self.term.dir == fn.fnamemodify(self.curr_file, ":h") then
+                local f = assert(io.open(self.id_tmpfile, "r"))
+                local data = f:read("*a")
+                f:close()
+
+                Job:new(
+                    {
+                        command = "lf",
+                        args = {
+                            "-remote",
+                            ("send %d select %s"):format(tonumber(data), fn.fnamemodify(self.curr_file, ":t"))
+                        }
+                    }
+                ):start()
+            end
+        end,
+        20
+    )
+
     for key, mapping in pairs(self.cfg.default_actions) do
         map(
             "t",
@@ -234,15 +262,20 @@ function Lf:__on_open(term)
             function()
                 -- Change default_action for easier reading in the callback
                 self.cfg.default_action = mapping
-                -- Set it to a `self` variable in case this is to ever be used again
+
+                -- FIX: If this is set above, it doesn't seem to work. The value is nil
+                --      There is only a need to read the file once
+                -- Also, if this for block is moved into defer_fn, the value remains nil
                 self.id =
+                    tonumber(
                     with(
-                    open(self.id_tmp),
-                    function(r)
-                        return r:read()
-                    end
+                        open(self.id_tmpfile),
+                        function(r)
+                            return r:read()
+                        end
+                    )
                 )
-                -- self.id_tmp = nil
+                -- self.id_tmpfile = nil
 
                 -- Manually tell `lf` to open the current file
                 -- since Neovim has hijacked the binding
@@ -268,7 +301,7 @@ function Lf:__on_open(term)
             function()
                 api.nvim_win_set_config(
                     self.winid,
-                    M.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
+                    utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
                 )
                 self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
             end
@@ -285,11 +318,11 @@ function Lf:__callback(term)
         utils.tmux(false)
     end
 
-    if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and uv.fs_stat(self.lastdir_tmp) then
+    if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and uv.fs_stat(self.lastdir_tmpfile) then
         -- Since plenary is already being used, this is used instead of `io`
         local last_dir =
             with(
-            open(self.lastdir_tmp),
+            open(self.lastdir_tmpfile),
             function(r)
                 return r:read()
             end
@@ -299,10 +332,10 @@ function Lf:__callback(term)
             vim.cmd(("%s %s"):format(self.cfg.default_action, last_dir))
             return
         end
-    elseif uv.fs_stat(self.lf_tmp) then
+    elseif uv.fs_stat(self.lf_tmpfile) then
         local contents = {}
 
-        for line in io.lines(self.lf_tmp) do
+        for line in io.lines(self.lf_tmpfile) do
             table.insert(contents, line)
         end
 
@@ -314,59 +347,6 @@ function Lf:__callback(term)
             end
         end
     end
-end
-
----Simple rounding function
----@param num number number to round
----@return number
-function M.round(num)
-    return math.floor(num + 0.5)
-end
-
----Get Neovim window height
----@return number
-function M.height()
-    return o.lines - o.cmdheight
-end
-
----Get neovim window width (minus signcolumn)
----@param bufnr number Buffer number from the file that Lf is opened from
----@param signcolumn string Signcolumn option set by the user, not the terminal buffer
----@return number
-function M.width(bufnr, signcolumn)
-    -- This is a rough estimate of the signcolumn
-    local width = #tostring(api.nvim_buf_line_count(bufnr))
-    local col = vim.split(signcolumn, ":")
-    if #col == 2 then
-        width = width + tonumber(col[2])
-    end
-    return signcolumn:match("no") and o.columns or o.columns - width
-end
-
----Get the table that is passed to `api.nvim_win_set_config`
----@param opts table
----@param bufnr number Buffer number from the file that Lf is opened from
----@param signcolumn string Signcolumn option set by the user, not the terminal buffer
----@return table
-function M.get_view(opts, bufnr, signcolumn)
-    opts = opts or {}
-    local width =
-        opts.width or math.ceil(math.min(M.width(bufnr, signcolumn), math.max(80, M.width(bufnr, signcolumn) - 20)))
-    local height = opts.height or math.ceil(math.min(M.height(), math.max(20, M.height() - 10)))
-
-    width = fn.float2nr(width * M.width(bufnr, signcolumn))
-    height = fn.float2nr(M.round(height * M.height()))
-    local col = fn.float2nr(M.round((M.width(bufnr, signcolumn) - width) / 2))
-    local row = fn.float2nr(M.round((M.height() - height) / 2))
-
-    return {
-        col = col,
-        row = row,
-        relative = "editor",
-        style = "minimal",
-        width = width,
-        height = height
-    }
 end
 
 M.Lf = Lf

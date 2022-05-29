@@ -5,6 +5,7 @@ local M = {}
 local fn = vim.fn
 local api = vim.api
 local levels = vim.log.levels
+local o = vim.o
 
 ---Echo a message with `nvim_echo`
 ---@param msg string message
@@ -89,6 +90,59 @@ M.tmux = function(disable)
         fn.system([[tmux set status on]])
         fn.system([[tmux list-panes -F '\#F' | grep -q Z && tmux resize-pane -Z]])
     end
+end
+
+---Simple rounding function
+---@param num number number to round
+---@return number
+function M.round(num)
+    return math.floor(num + 0.5)
+end
+
+---Get Neovim window height
+---@return number
+function M.height()
+    return o.lines - o.cmdheight
+end
+
+---Get neovim window width (minus signcolumn)
+---@param bufnr number Buffer number from the file that Lf is opened from
+---@param signcolumn string Signcolumn option set by the user, not the terminal buffer
+---@return number
+function M.width(bufnr, signcolumn)
+    -- This is a rough estimate of the signcolumn
+    local width = #tostring(api.nvim_buf_line_count(bufnr))
+    local col = vim.split(signcolumn, ":")
+    if #col == 2 then
+        width = width + tonumber(col[2])
+    end
+    return signcolumn:match("no") and o.columns or o.columns - width
+end
+
+---Get the table that is passed to `api.nvim_win_set_config`
+---@param opts table
+---@param bufnr number Buffer number from the file that Lf is opened from
+---@param signcolumn string Signcolumn option set by the user, not the terminal buffer
+---@return table
+function M.get_view(opts, bufnr, signcolumn)
+    opts = opts or {}
+    local width =
+        opts.width or math.ceil(math.min(M.width(bufnr, signcolumn), math.max(80, M.width(bufnr, signcolumn) - 20)))
+    local height = opts.height or math.ceil(math.min(M.height(), math.max(20, M.height() - 10)))
+
+    width = fn.float2nr(width * M.width(bufnr, signcolumn))
+    height = fn.float2nr(M.round(height * M.height()))
+    local col = fn.float2nr(M.round((M.width(bufnr, signcolumn) - width) / 2))
+    local row = fn.float2nr(M.round((M.height() - height) / 2))
+
+    return {
+        col = col,
+        row = row,
+        relative = "editor",
+        style = "minimal",
+        width = width,
+        height = height
+    }
 end
 
 return M

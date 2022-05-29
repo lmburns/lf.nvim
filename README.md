@@ -54,6 +54,7 @@ require("lf").setup({
   height = 0.80, -- height of the *floating* window
   width = 0.85, -- width of the *floating* window
   escape_quit = true, -- map escape to the quit command (so it doesn't go into a meta normal mode)
+  focus_on_open = false, -- focus the current file when opening Lf (experimental)
   mappings = true, -- whether terminal buffer mapping is enabled
   tmux = false, -- tmux statusline can be disabled on opening of Lf
   highlights = { -- highlights passed to toggleterm

@@ -9,6 +9,7 @@
 --- @field height number: height of the *floating* window
 --- @field width number: width of the *floating* window
 --- @field escape_quit boolean: whether escape should be mapped to quit
+--- @field focus_on_open boolean: whether Lf should open focused on current file
 --- @field mappings boolean: whether terminal buffer mappings should be set
 --- @field tmux boolean: whether tmux statusline should be changed by this plugin
 --- @field highlights table: highlight table to pass to `toggleterm`
@@ -43,6 +44,7 @@ local function init()
         height = 0.80,
         width = 0.85,
         escape_quit = true,
+        focus_on_open = true,
         mappings = true,
         tmux = false,
         highlights = {},
@@ -56,7 +58,7 @@ local function init()
             },
             {width = 0.800, height = 0.800},
             {width = 0.950, height = 0.950}
-        },
+        }
     }
 
     Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
@@ -67,31 +69,40 @@ init()
 
 -- local notify = require("lf.utils").notify
 
----Verify that configuration options that are numbers are numbers or can be converted to numbers
----@param field string | number: `Config` field to check
----@param default number: Default value to return if the conversion failed
-function Config:__check_number(field, default)
-    if type(field) == "string" then
-        local res = tonumber(field)
-        return F.if_nil(res, default)
-    elseif type(field) == "number" then
-        return field
-    end
-
-    return default
-end
-
 ---Set a configuration passed as a function argument (not through `setup`)
 ---@param cfg table configuration options
 ---@return Config
 function Config:set(cfg)
     if cfg and type(cfg) == "table" then
-        -- TODO: Maybe verify more options in configuration?
-        cfg.winblend = self:__check_number(cfg.winblend, self.winblend)
-        cfg.height = self:__check_number(cfg.height, self.height)
-        cfg.width = self:__check_number(cfg.width, self.width)
-
         self = vim.tbl_deep_extend("force", self, cfg or {})
+
+        vim.validate(
+            {
+                default_cmd = {self.default_cmd, "s", false},
+                default_action = {self.default_action, "s", false},
+                default_actions = {self.default_actions, "t", false},
+                winblend = {self.winblend, {"n", "s"}, false},
+                dir = {self.dir, "s", false},
+                direction = {self.direction, "s", false},
+                border = {self.border, "s", false},
+                height = {self.height, {"n", "s"}, false},
+                width = {self.width, {"n", "s"}, false},
+                escape_quit = {self.escape_quit, "b", false},
+                focus_on_open = {self.focus_on_open, "b", false},
+                mappings = {self.mappings, "b", false},
+                tmux = {self.tmux, "b", false},
+                highlights = {self.highlights, "t", false},
+                -- Layout configurations
+                layout_mapping = {self.layout_mapping, "s", false},
+                views = {self.views, "t", false}
+            }
+        )
+
+        -- Just run `tonumber` on all items that can be strings
+        -- Checking if each one is a string might take longer
+        self.winblend = tonumber(self.winblend)
+        self.height = tonumber(self.height)
+        self.width = tonumber(self.width)
     end
 
     return self
