@@ -92,7 +92,7 @@ function Lf:new(config)
     self.id_tmpfile = nil
     self.id = nil
     self.curr_file = nil
-    self.bufnr = api.nvim_get_current_buf()
+    self.bufnr = 0
     -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
 
@@ -221,7 +221,8 @@ end
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
-    -- api.nvim_command("setlocal filetype=lf")
+    self.bufnr = api.nvim_get_current_buf()
+    api.nvim_buf_set_option(self.bufnr, "filetype", "lf")
 
     if self.cfg.tmux then
         utils.tmux(true)
