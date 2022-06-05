@@ -95,7 +95,7 @@ vim.keymap.set(
       -- nil, -- this is the path to open Lf (nil means CWD)
               -- this argument is optional see `.start` below
       {
-        -- Pass any options (if any) that you would like
+        -- Pass options (if any) that you would like
         dir = "", -- directory where `lf` starts ('gwd' is git-working-directory)
         direction = "float", -- window type: float horizontal vertical
         border = "double", -- border kind: single double shadow curved
@@ -154,7 +154,8 @@ require("lf").start({ mappings = false })
 ```
 
 ### Replacing Netrw
-The only configurable environment variable is `g:lf_netrw`, which can be set to `1` or `true` to replace `netrw`
+The only configurable environment variable is `g:lf_netrw`, which can be set to `1` or `true` to replace `netrw`.
+Also, note that this option will not work if `lf` is lazy-loaded.
 
 ### Key mappings
 The mappings that are listed in the `setup` call above are the default bindings.
