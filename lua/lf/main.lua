@@ -3,17 +3,16 @@ local M = {}
 ---@diagnostic disable: redefined-local
 
 local utils = require("lf.utils")
-local notify = utils.notify
 
 local res, terminal = pcall(require, "toggleterm")
 if not res then
-    notify("toggleterm.nvim must be installed to use this program", "error")
+    utils.err("toggleterm.nvim must be installed to use this program", true)
     return
 end
 
 local res, Path = pcall(require, "plenary.path")
 if not res then
-    notify("plenary must be installed to use this program", "error")
+    utils.err("plenary must be installed to use this program", true)
     return
 end
 
@@ -30,7 +29,7 @@ local Job = require("plenary.job")
 local Config = require("lf.config")
 local with = require("plenary.context_manager").with
 local open = require("plenary.context_manager").open
-local a = require("plenary.async_lib")
+-- local a = require("plenary.async_lib")
 
 --- @class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
@@ -46,6 +45,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 --- @field id number Current Lf session id
 --- @field curr_file string|nil File path to the currently opened file
 --- @field bufnr number The open file's buffer number
+--- @field action string The current action to open the file
 --- @field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
 
@@ -65,7 +65,7 @@ local function setup_term(highlights)
             shade_terminals = true,
             shading_factor = "1",
             start_in_insert = true,
-            insert_mappings = true,
+            insert_mappings = false,
             persist_size = true,
             highlights = highlights
         }
@@ -89,10 +89,11 @@ function Lf:new(config)
 
     self.view_idx = 1
     self.winid = nil
-    self.id_tmpfile = nil
+    self.bufnr = 0
     self.id = nil
     self.curr_file = nil
-    self.bufnr = 0
+    self.id_tmpfile = nil
+    self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
 
@@ -128,20 +129,13 @@ end
 function Lf:start(path)
     self:__open_in(path or self.cfg.dir)
     if M.error ~= nil then
-        notify(M.error, "error")
+        utils.err(M.error, true)
         return
     end
     self:__wrapper()
 
-    if self.cfg.mappings then
-        self.term.on_open = function(term)
-            self:__on_open(term)
-        end
-    else
-        self.term.on_open = function(_)
-            self.winid = api.nvim_get_current_win()
-            api.nvim_win_set_option(self.winid, "wrap", true)
-        end
+    self.term.on_open = function(term)
+        self:__on_open(term)
     end
 
     self.term.on_exit = function(term, _, _, _)
@@ -167,7 +161,7 @@ function Lf:__open_in(path)
         Path:new(
         (function(dir)
             if dir == "gwd" then
-                dir = require("lf.utils").git_dir()
+                dir = utils.git_dir()
             end
 
             if dir ~= "" then
@@ -180,7 +174,7 @@ function Lf:__open_in(path)
     )
 
     if not path:exists() then
-        utils.info("Current file doesn't exist")
+        utils.info("Current file doesn't exist", true)
     -- M.error = ("directory doesn't exist: %s"):format(path)
     -- return
     end
@@ -221,19 +215,28 @@ end
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
-    self.bufnr = api.nvim_get_current_buf()
-    -- TODO: Find a way to set custom filetype
-    -- api.nvim_buf_set_option(self.bufnr, "filetype", "lf_term")
+    -- For easier reference
+    self.bufnr = term.bufnr
+    self.winid = term.window
+    vim.cmd("silent doautocmd User LfTermEnter")
 
-    -- For now, use a global variable that can act as a filetype
-    vim.g.inside_lf = true
+    -- Wrap needs to be set, otherwise the window isn't aligned on resize
+    api.nvim_buf_call(
+        self.bufnr,
+        function()
+            vim.wo[self.winid].showbreak = "NONE"
+            vim.wo[self.winid].wrap = true
+            -- vim.bo[self.bufnr].ft = ("%s.lf"):format(vim.bo[self.bufnr].ft)
+            -- vim.cmd("redraw")
+        end
+    )
 
     if self.cfg.tmux then
         utils.tmux(true)
     end
 
-    if self.cfg.escape_quit then
-        map("t", "<Esc>", "<Cmd>q<CR>", {buffer = term.bufnr, desc = "Exit Lf"})
+    if self.cfg.mappings and self.cfg.escape_quit then
+        map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
     end
 
     -- This will not work without deferring the function
@@ -241,7 +244,7 @@ function Lf:__on_open(term)
     -- However, if the :Lf command is used, reading the value provides a nil value
     vim.defer_fn(
         function()
-            if self.cfg.focus_on_open and self.term.dir == fn.fnamemodify(self.curr_file, ":h") then
+            if self.cfg.focus_on_open and term.dir == fn.fnamemodify(self.curr_file, ":h") then
                 local f = assert(io.open(self.id_tmpfile, "r"))
                 local data = f:read("*a")
                 f:close()
@@ -260,57 +263,55 @@ function Lf:__on_open(term)
         20
     )
 
-    for key, mapping in pairs(self.cfg.default_actions) do
-        map(
-            "t",
-            key,
-            function()
-                -- Change default_action for easier reading in the callback
-                self.cfg.default_action = mapping
+    if self.cfg.mappings then
+        for key, mapping in pairs(self.cfg.default_actions) do
+            map(
+                "t",
+                key,
+                function()
+                    -- Change default_action for easier reading in the callback
+                    self.action = mapping
 
-                -- FIX: If this is set above, it doesn't seem to work. The value is nil
-                --      There is only a need to read the file once
-                -- Also, if this for block is moved into defer_fn, the value remains nil
-                self.id =
-                    tonumber(
-                    with(
-                        open(self.id_tmpfile),
-                        function(r)
-                            return r:read()
-                        end
+                    -- FIX: If this is set above, it doesn't seem to work. The value is nil
+                    --      There is only a need to read the file once
+                    -- Also, if this for block is moved into defer_fn, the value remains nil
+                    self.id =
+                        tonumber(
+                        with(
+                            open(self.id_tmpfile),
+                            function(r)
+                                return r:read()
+                            end
+                        )
                     )
-                )
-                -- self.id_tmpfile = nil
+                    -- self.id_tmpfile = nil
 
-                -- Manually tell `lf` to open the current file
-                -- since Neovim has hijacked the binding
-                Job:new(
-                    {
-                        command = "lf",
-                        args = {"-remote", ("send %d open"):format(self.id)}
-                    }
-                ):sync()
-            end,
-            {noremap = true, buffer = term.bufnr, desc = ("Lf %s"):format(mapping)}
-        )
-    end
+                    -- Manually tell `lf` to open the current file
+                    -- since Neovim has hijacked the binding
+                    Job:new(
+                        {
+                            command = "lf",
+                            args = {"-remote", ("send %d open"):format(self.id)}
+                        }
+                    ):sync()
+                end,
+                {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)}
+            )
+        end
 
-    if self.cfg.layout_mapping then
-        self.winid = api.nvim_get_current_win()
-        -- Wrap needs to be set, otherwise the window isn't aligned on resize
-        api.nvim_win_set_option(self.winid, "wrap", true)
-
-        map(
-            "t",
-            self.cfg.layout_mapping,
-            function()
-                api.nvim_win_set_config(
-                    self.winid,
-                    utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
-                )
-                self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
-            end
-        )
+        if self.cfg.layout_mapping then
+            map(
+                "t",
+                self.cfg.layout_mapping,
+                function()
+                    api.nvim_win_set_config(
+                        self.winid,
+                        utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
+                    )
+                    self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
+                end
+            )
+        end
     end
 end
 
@@ -323,9 +324,7 @@ function Lf:__callback(term)
         utils.tmux(false)
     end
 
-    vim.g.inside_lf = false
-
-    if (self.cfg.default_action == "cd" or self.cfg.default_action == "lcd") and uv.fs_stat(self.lastdir_tmpfile) then
+    if (self.action == "cd" or self.action == "lcd") and uv.fs_stat(self.lastdir_tmpfile) then
         -- Since plenary is already being used, this is used instead of `io`
         local last_dir =
             with(
@@ -336,7 +335,7 @@ function Lf:__callback(term)
         )
 
         if last_dir ~= uv.cwd() then
-            vim.cmd(("%s %s"):format(self.cfg.default_action, last_dir))
+            vim.cmd(("%s %s"):format(self.action, last_dir))
             return
         end
     elseif uv.fs_stat(self.lf_tmpfile) then
@@ -350,10 +349,18 @@ function Lf:__callback(term)
             term:close()
 
             for _, fname in pairs(contents) do
-                vim.cmd(("%s %s"):format(self.cfg.default_action, Path:new(fname):absolute()))
+                vim.cmd(("%s %s"):format(self.action, Path:new(fname):absolute()))
             end
         end
     end
+
+    -- Reset the action
+    vim.defer_fn(
+        function()
+            self.action = self.cfg.default_action
+        end,
+        1
+    )
 end
 
 M.Lf = Lf

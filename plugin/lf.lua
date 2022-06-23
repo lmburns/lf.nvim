@@ -18,7 +18,6 @@ api.nvim_create_user_command(
 )
 
 if vim.g.lf_netrw == 1 or vim.g.lf_netrw then
-    local Path = require("plenary.path")
     local group = api.nvim_create_augroup("ReplaceNetrwWithLf", {clear = true})
 
     api.nvim_create_autocmd(
@@ -42,36 +41,21 @@ if vim.g.lf_netrw == 1 or vim.g.lf_netrw then
             group = group,
             once = true,
             callback = function()
-                local path = Path:new(fn.expand("%"))
+                local bufnr = api.nvim_get_current_buf()
+                local path = require("plenary.path"):new(fn.expand("%"))
                 if path:is_dir() and fn.argc() ~= 0 then
-                    local bufnr = fn.bufnr()
-                    vim.cmd(("sil! bwipeout %d"):format(bufnr))
+                    vim.cmd(("sil! bwipeout! %s"):format(bufnr))
 
                     vim.defer_fn(
                         function()
                             require("lf").start(path:absolute())
                         end,
-                        100
+                        1
                     )
                 end
             end
         }
     )
 end
-
---  TODO: Finish this command
---  command! -nargs=* -complete=file LfToggle lua require('lf').setup():toggle(<f-args>)
---
--- cmd [[
---  if exists('g:lf_replace_netrw') && g:lf_replace_netrw
---    augroup ReplaceNetrwWithLf
---      autocmd VimEnter * silent! autocmd! FileExplorer
---      autocmd BufEnter * let s:buf_path = expand("%")
---            \ | if isdirectory(s:buf_path)
---            \ | call timer_start(100, v:lua.require'lf'.start(s:buf_path))
---            \ | endif
---    augroup END
---  endif
--- ]]
 
 return M

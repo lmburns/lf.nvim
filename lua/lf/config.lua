@@ -19,7 +19,6 @@ local Config = {}
 
 local fn = vim.fn
 local o = vim.o
-local F = vim.F
 
 -- A local function that runs each time allows for a global `.setup()` to work
 
@@ -43,7 +42,7 @@ local function init()
         border = "double",
         height = 0.80,
         width = 0.85,
-        escape_quit = true,
+        escape_quit = false,
         focus_on_open = true,
         mappings = true,
         tmux = false,

@@ -15,32 +15,49 @@ M.echomsg = function(msg, hl)
     api.nvim_echo({{msg, hl}}, true, {})
 end
 
----Display an info message on the CLI
----@param msg string
-M.info = function(msg)
-    M.echomsg(("[INFO]: %s"):format(msg), "Directory")
-    -- M.echomsg(("[INFO]: %s"):format(msg), "Identifier")
-end
-
----Display a warning message on the CLI
----@param msg string
-M.warn = function(msg)
-    M.echomsg(("[WARN]: %s"):format(msg), "WarningMsg")
-end
-
----Display an error message on the CLI
----@param msg string
-M.err = function(msg)
-    M.echomsg(("[ERR]: %s"):format(msg), "ErrorMsg")
-end
-
 ---Display notification message
 ---@param msg string
----@param level 'error' | 'info' | 'warn'
-M.notify = function(msg, level)
-    ---@diagnostic disable-next-line: undefined-field
-    level = level and levels[level:upper()] or levels.INFO
-    vim.notify(("[lf]: %s"):format(msg), level)
+---@param level number
+---@param opts table
+M.notify = function(msg, level, opts)
+    opts = vim.tbl_extend("force", opts or {}, {title = "lf.nvim"})
+    vim.notify(msg, level, opts)
+end
+
+---INFO message
+---@param msg string
+---@param notify boolean?
+---@param opts table?
+M.info = function(msg, notify, opts)
+    if notify then
+        M.notify(msg, levels.INFO, opts)
+    else
+        M.echomsg(("[INFO]: %s"):format(msg), "Directory")
+    end
+end
+
+---WARN message
+---@param msg string
+---@param notify boolean?
+---@param opts table?
+M.warn = function(msg, notify, opts)
+    if notify then
+        M.notify(msg, levels.WARN, opts)
+    else
+        M.echomsg(("[WARN]: %s"):format(msg), "WarningMsg")
+    end
+end
+
+---ERROR message
+---@param msg string
+---@param notify boolean?
+---@param opts table?
+M.err = function(msg, notify, opts)
+    if notify then
+        M.notify(msg, levels.ERROR, opts)
+    else
+        M.echomsg(("[ERR]: %s"):format(msg), "ErrorMsg")
+    end
 end
 
 ---Helper function to derive the current git directory path
