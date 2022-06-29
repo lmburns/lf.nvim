@@ -18,7 +18,7 @@ end
 ---Display notification message
 ---@param msg string
 ---@param level number
----@param opts table
+---@param opts table?
 M.notify = function(msg, level, opts)
     opts = vim.tbl_extend("force", opts or {}, {title = "lf.nvim"})
     vim.notify(msg, level, opts)
@@ -76,22 +76,12 @@ end
 ---Create a neovim keybinding
 ---@param mode string vim mode in a single letter
 ---@param lhs string keys that are bound
----@param rhs string string or lua function that is mapped to the keys
+---@param rhs string|function string or lua function that is mapped to the keys
 ---@param opts table? options set for the mapping
 M.map = function(mode, lhs, rhs, opts)
     opts = opts or {}
     opts.noremap = opts.noremap == nil and true or opts.noremap
     vim.keymap.set(mode, lhs, rhs, opts)
-
-    local ok, wk = pcall(require, "which-key")
-    if ok and opts.desc then
-        wk.register(
-            {
-                [lhs] = opts.desc
-            },
-            {mode = mode}
-        )
-    end
 end
 
 ---Set the tmux statusline when opening/closing `Lf`
@@ -123,16 +113,19 @@ function M.height()
 end
 
 ---Get neovim window width (minus signcolumn)
----@param bufnr number Buffer number from the file that Lf is opened from
----@param signcolumn string Signcolumn option set by the user, not the terminal buffer
+---@param bufnr number: Buffer number from the file that Lf is opened from
+---@param signcolumn string: Signcolumn option set by the user, not the terminal buffer
 ---@return number
 function M.width(bufnr, signcolumn)
     -- This is a rough estimate of the signcolumn
     local width = #tostring(api.nvim_buf_line_count(bufnr))
     local col = vim.split(signcolumn, ":")
     if #col == 2 then
+        -- Can't cast integer to number?
+        ---@diagnostic disable-next-line:cast-local-type
         width = width + tonumber(col[2])
     end
+    ---@diagnostic disable-next-line:return-type-mismatch
     return signcolumn:match("no") and o.columns or o.columns - width
 end
 

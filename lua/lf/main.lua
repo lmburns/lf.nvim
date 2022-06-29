@@ -34,19 +34,19 @@ local open = require("plenary.context_manager").open
 --- @class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
 
---- @class Lf
---- @field cfg Config Configuration options
---- @field term Terminal Toggle terminal
---- @field view_idx number Current index of configuration `views`
---- @field winid number `Terminal` window id
---- @field lf_tmpfile string File path with the files to open with `lf`
---- @field lastdir_tmpfile string File path with the last directory `lf` was in
---- @field id_tmpfile string File path to a file containing `lf`'s id
---- @field id number Current Lf session id
---- @field curr_file string|nil File path to the currently opened file
---- @field bufnr number The open file's buffer number
---- @field action string The current action to open the file
---- @field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
+---@class Lf
+---@field cfg Config Configuration options
+---@field term Terminal Toggle terminal
+---@field view_idx number Current index of configuration `views`
+---@field winid number? `Terminal` window id
+---@field lf_tmpfile string File path with the files to open with `lf`
+---@field lastdir_tmpfile string File path with the last directory `lf` was in
+---@field id_tmpfile? string File path to a file containing `lf`'s id
+---@field id number? Current Lf session id
+---@field curr_file string|nil File path to the currently opened file
+---@field bufnr number The open file's buffer number
+---@field action string The current action to open the file
+---@field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
 
 local function setup_term(highlights)
@@ -175,8 +175,6 @@ function Lf:__open_in(path)
 
     if not path:exists() then
         utils.info("Current file doesn't exist", true)
-    -- M.error = ("directory doesn't exist: %s"):format(path)
-    -- return
     end
 
     -- Should be fine, but just checking
@@ -239,11 +237,28 @@ function Lf:__on_open(term)
         map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
     end
 
+    -- FIX: Asynchronous errors with no access to asynchronous code
     -- This will not work without deferring the function
     -- If the module is reloaded via plenary, then re-required and ran it will work
     -- However, if the :Lf command is used, reading the value provides a nil value
+    --
+    -- Another odd behavior is that if the first line of the function does something like
+    -- `vim.notify(("Currfile: '%s'"):format(self.curr_file))`, then the deferring time can be less
+    --
+    -- Numbers greater than 20 are noticeable
+    -- I believe this has to do with the `on_open` callback being asynchronous
+    -- If there were to be a way to block the callback until `self.curr_file` was set, this would be fixed
     vim.defer_fn(
         function()
+            if self.curr_file == nil then
+                utils.notify(
+                    "Function has not been deferred long enough, preventing `focus_on_open` from working.\n" ..
+                        "Please report an issue on Github (lmburns/lf.nvim)",
+                    utils.levels.WARN
+                )
+                return
+            end
+
             if self.cfg.focus_on_open and term.dir == fn.fnamemodify(self.curr_file, ":h") then
                 local f = assert(io.open(self.id_tmpfile, "r"))
                 local data = f:read("*a")
@@ -257,10 +272,10 @@ function Lf:__on_open(term)
                             ("send %d select %s"):format(tonumber(data), fn.fnamemodify(self.curr_file, ":t"))
                         }
                     }
-                ):start()
+                ):sync()
             end
         end,
-        20
+        30
     )
 
     if self.cfg.mappings then
@@ -274,7 +289,9 @@ function Lf:__on_open(term)
 
                     -- FIX: If this is set above, it doesn't seem to work. The value is nil
                     --      There is only a need to read the file once
-                    -- Also, if this for block is moved into defer_fn, the value remains nil
+                    --      Error has to do with the above mentioned on
+
+                    -- ---@cast self.id -?
                     self.id =
                         tonumber(
                         with(
