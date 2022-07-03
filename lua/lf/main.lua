@@ -30,6 +30,7 @@ local Config = require("lf.config")
 local with = require("plenary.context_manager").with
 local open = require("plenary.context_manager").open
 -- local a = require("plenary.async_lib")
+-- local promise = require("promise")
 
 --- @class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
@@ -142,7 +143,7 @@ function Lf:start(path)
         self:__callback(term)
     end
 
-    self.term:toggle()
+    self.term:open()
 end
 
 ---Toggle `Lf` on and off
@@ -238,6 +239,7 @@ function Lf:__on_open(term)
     end
 
     -- FIX: Asynchronous errors with no access to asynchronous code
+    -- Though, toggleterm has no asynchronousity, but plenary does
     -- This will not work without deferring the function
     -- If the module is reloaded via plenary, then re-required and ran it will work
     -- However, if the :Lf command is used, reading the value provides a nil value
@@ -259,6 +261,8 @@ function Lf:__on_open(term)
                 return
             end
 
+            -- local curr_file = api.nvim_buf_get_name(fn.bufnr("#"))
+
             if self.cfg.focus_on_open and term.dir == fn.fnamemodify(self.curr_file, ":h") then
                 local f = assert(io.open(self.id_tmpfile, "r"))
                 local data = f:read("*a")
@@ -270,12 +274,15 @@ function Lf:__on_open(term)
                         args = {
                             "-remote",
                             ("send %d select %s"):format(tonumber(data), fn.fnamemodify(self.curr_file, ":t"))
-                        }
+                        },
+                        interactive = false,
+                        detached = true,
+                        enabled_recording = false
                     }
-                ):sync()
+                ):start()
             end
         end,
-        30
+        25
     )
 
     if self.cfg.mappings then
