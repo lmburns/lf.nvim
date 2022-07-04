@@ -22,6 +22,9 @@ local uv = vim.loop
 local o = vim.o
 local map = utils.map
 
+local promise = require("promise")
+local async = require("async")
+
 ---Error for this program
 M.error = nil
 
@@ -32,7 +35,7 @@ local open = require("plenary.context_manager").open
 -- local a = require("plenary.async_lib")
 -- local promise = require("promise")
 
---- @class Terminal
+---@class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
 
 ---@class Lf
@@ -128,22 +131,25 @@ end
 ---Start the underlying terminal
 ---@param path string path where lf starts (reads from config if none, else CWD)
 function Lf:start(path)
-    self:__open_in(path or self.cfg.dir)
-    if M.error ~= nil then
-        utils.err(M.error, true)
-        return
-    end
-    self:__wrapper()
+    self:__open_in(path or self.cfg.dir):thenCall(
+        function()
+            if M.error ~= nil then
+                utils.err(M.error, true)
+                return
+            end
+            self:__wrapper()
 
-    self.term.on_open = function(term)
-        self:__on_open(term)
-    end
+            self.term.on_open = function(term)
+                self:__on_open(term)
+            end
 
-    self.term.on_exit = function(term, _, _, _)
-        self:__callback(term)
-    end
+            self.term.on_exit = function(term, _, _, _)
+                self:__callback(term)
+            end
 
-    self.term:open()
+            self.term:open()
+        end
+    )
 end
 
 ---Toggle `Lf` on and off
@@ -156,37 +162,41 @@ end
 ---Set the directory for `Lf` to open in
 ---
 ---@param path string
----@return Lf
+---@return Promise
 function Lf:__open_in(path)
-    path =
-        Path:new(
-        (function(dir)
-            if dir == "gwd" then
-                dir = utils.git_dir()
+    ---The whole reason this is async is to make sure that the self
+    ---variables have been set and are valid
+    return async(
+        function()
+            path =
+                Path:new(
+                (function(dir)
+                    if dir == "gwd" then
+                        dir = utils.git_dir()
+                    end
+
+                    if dir ~= "" then
+                        return fn.expand(dir)
+                    else
+                        -- Base the CWD on the filename and not `lcd` and such
+                        return fn.expand("%:p")
+                    end
+                end)(path)
+            )
+
+            if not path:exists() then
+                utils.info("Current file doesn't exist", true)
             end
 
-            if dir ~= "" then
-                return fn.expand(dir)
-            else
-                -- Base the CWD on the filename and not `lcd` and such
-                return fn.expand("%:p")
+            -- Should be fine, but just checking
+            if not path:is_dir() then
+                path = path:parent()
             end
-        end)(path)
+
+            self.term.dir = path:absolute()
+            self.curr_file = fn.expand("%:p")
+        end
     )
-
-    if not path:exists() then
-        utils.info("Current file doesn't exist", true)
-    end
-
-    -- Should be fine, but just checking
-    if not path:is_dir() then
-        path = path:parent()
-    end
-
-    self.term.dir = path:absolute()
-    self.curr_file = fn.expand("%:p")
-
-    return self
 end
 
 ---@private
@@ -199,7 +209,6 @@ function Lf:__wrapper()
     self.id_tmpfile = os.tmpname()
 
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
-
     self.term.cmd =
         ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]]):format(
         self.term.cmd,
@@ -214,30 +223,6 @@ end
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
-    -- For easier reference
-    self.bufnr = term.bufnr
-    self.winid = term.window
-    vim.cmd("silent doautocmd User LfTermEnter")
-
-    -- Wrap needs to be set, otherwise the window isn't aligned on resize
-    api.nvim_buf_call(
-        self.bufnr,
-        function()
-            vim.wo[self.winid].showbreak = "NONE"
-            vim.wo[self.winid].wrap = true
-            -- vim.bo[self.bufnr].ft = ("%s.lf"):format(vim.bo[self.bufnr].ft)
-            -- vim.cmd("redraw")
-        end
-    )
-
-    if self.cfg.tmux then
-        utils.tmux(true)
-    end
-
-    if self.cfg.mappings and self.cfg.escape_quit then
-        map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
-    end
-
     -- FIX: Asynchronous errors with no access to asynchronous code
     -- Though, toggleterm has no asynchronousity, but plenary does
     -- This will not work without deferring the function
@@ -250,93 +235,110 @@ function Lf:__on_open(term)
     -- Numbers greater than 20 are noticeable
     -- I believe this has to do with the `on_open` callback being asynchronous
     -- If there were to be a way to block the callback until `self.curr_file` was set, this would be fixed
+
+    -- When using promises, and deferring the entire function, things go a little smoother.
     vim.defer_fn(
         function()
-            if self.curr_file == nil then
-                utils.notify(
-                    "Function has not been deferred long enough, preventing `focus_on_open` from working.\n" ..
-                        "Please report an issue on Github (lmburns/lf.nvim)",
-                    utils.levels.WARN
-                )
-                return
+            -- For easier reference
+            self.bufnr = term.bufnr
+            self.winid = term.window
+            vim.cmd("silent doautocmd User LfTermEnter")
+
+            -- Wrap needs to be set, otherwise the window isn't aligned on resize
+            api.nvim_win_call(
+                self.winid,
+                function()
+                    vim.wo.showbreak = "NONE"
+                    vim.wo.wrap = true
+                end
+            )
+
+            if self.cfg.tmux then
+                utils.tmux(true)
+            end
+
+            if self.cfg.mappings and self.cfg.escape_quit then
+                map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
             end
 
             -- local curr_file = api.nvim_buf_get_name(fn.bufnr("#"))
 
-            if self.cfg.focus_on_open and term.dir == fn.fnamemodify(self.curr_file, ":h") then
-                local f = assert(io.open(self.id_tmpfile, "r"))
-                local data = f:read("*a")
-                f:close()
+            if self.cfg.focus_on_open then
+                if self.curr_file == nil then
+                    utils.notify(
+                        "Function has not been deferred long enough, preventing `focus_on_open` from working.\n" ..
+                            "Please report an issue on Github (lmburns/lf.nvim)",
+                        utils.levels.WARN
+                    )
+                elseif term.dir == fn.fnamemodify(self.curr_file, ":h") then
+                    utils.readFile(self.id_tmpfile):thenCall(
+                        function(d)
+                            self.id = tonumber(vim.trim(d))
 
-                Job:new(
-                    {
-                        command = "lf",
-                        args = {
-                            "-remote",
-                            ("send %d select %s"):format(tonumber(data), fn.fnamemodify(self.curr_file, ":t"))
-                        },
-                        interactive = false,
-                        detached = true,
-                        enabled_recording = false
-                    }
-                ):start()
+                            Job:new(
+                                {
+                                    command = "lf",
+                                    args = {
+                                        "-remote",
+                                        ("send %d select %s"):format(self.id, fn.fnamemodify(self.curr_file, ":t"))
+                                    },
+                                    interactive = false,
+                                    detached = true,
+                                    enabled_recording = false
+                                }
+                            ):start()
+                        end
+                    )
+                end
+            end
+
+            if self.cfg.mappings then
+                for key, mapping in pairs(self.cfg.default_actions) do
+                    map(
+                        "t",
+                        key,
+                        function()
+                            -- Change default_action for easier reading in the callback
+                            self.action = mapping
+
+                            if type(self.id) ~= "number" then
+                                utils.readFile(self.id_tmpfile):thenCall(
+                                    function(data)
+                                        self.id = tonumber(data)
+                                    end
+                                )
+                            end
+
+                            -- Manually tell `lf` to open the current file
+                            -- since Neovim has hijacked the binding
+                            Job:new(
+                                {
+                                    command = "lf",
+                                    args = {"-remote", ("send %d open"):format(self.id)}
+                                }
+                            ):sync()
+                        end,
+                        {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)}
+                    )
+                end
+
+                if self.cfg.layout_mapping then
+                    map(
+                        "t",
+                        self.cfg.layout_mapping,
+                        function()
+                            api.nvim_win_set_config(
+                                self.winid,
+                                utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
+                            )
+                            self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
+                        end
+                    )
+                end
             end
         end,
-        25
+        20
     )
-
-    if self.cfg.mappings then
-        for key, mapping in pairs(self.cfg.default_actions) do
-            map(
-                "t",
-                key,
-                function()
-                    -- Change default_action for easier reading in the callback
-                    self.action = mapping
-
-                    -- FIX: If this is set above, it doesn't seem to work. The value is nil
-                    --      There is only a need to read the file once
-                    --      Error has to do with the above mentioned on
-
-                    -- ---@cast self.id -?
-                    self.id =
-                        tonumber(
-                        with(
-                            open(self.id_tmpfile),
-                            function(r)
-                                return r:read()
-                            end
-                        )
-                    )
-                    -- self.id_tmpfile = nil
-
-                    -- Manually tell `lf` to open the current file
-                    -- since Neovim has hijacked the binding
-                    Job:new(
-                        {
-                            command = "lf",
-                            args = {"-remote", ("send %d open"):format(self.id)}
-                        }
-                    ):sync()
-                end,
-                {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)}
-            )
-        end
-
-        if self.cfg.layout_mapping then
-            map(
-                "t",
-                self.cfg.layout_mapping,
-                function()
-                    api.nvim_win_set_config(
-                        self.winid,
-                        utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
-                    )
-                    self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
-                end
-            )
-        end
-    end
 end
 
 ---@private

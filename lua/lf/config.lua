@@ -70,7 +70,7 @@ init()
 
 ---Set a configuration passed as a function argument (not through `setup`)
 ---@param cfg table configuration options
----@return Config
+---@return Config?
 function Config:set(cfg)
     if cfg and type(cfg) == "table" then
         self = vim.tbl_deep_extend("force", self, cfg or {})

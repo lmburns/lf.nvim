@@ -7,10 +7,53 @@ local api = vim.api
 local levels = vim.log.levels
 local o = vim.o
 
+local uv = vim.loop
+local promise = require("promise")
+local compat = require("promise-async.compat")
+local async = require("async")
+
+local function wrap(name, argc)
+    return function(...)
+        local argv = {...}
+        return promise(
+            function(resolve, reject)
+                argv[argc] = function(err, data)
+                    if err then
+                        reject(err)
+                    else
+                        resolve(data)
+                    end
+                end
+                uv[name](compat.unpack(argv))
+            end
+        )
+    end
+end
+
+M.open = wrap("fs_open", 4)
+M.close = wrap("fs_close", 2)
+M.read = wrap("fs_read", 4)
+M.fstat = wrap("fs_fstat", 2)
+
+---
+---@param path string file path to read
+---@return string|nil
+function M.readFile(path)
+    return async(
+        function()
+            local fd = await(M.open(path, "r", 438))
+            local stat = await(M.fstat(fd))
+            local data = await(M.read(fd, stat.size, 0))
+            await(M.close(fd))
+            return data
+        end
+    )
+end
+
 ---Echo a message with `nvim_echo`
 ---@param msg string message
 ---@param hl string highlight group
-M.echomsg = function(msg, hl)
+function M.echomsg(msg, hl)
     hl = hl or "Title"
     api.nvim_echo({{msg, hl}}, true, {})
 end
@@ -19,7 +62,7 @@ end
 ---@param msg string
 ---@param level number
 ---@param opts table?
-M.notify = function(msg, level, opts)
+function M.notify(msg, level, opts)
     opts = vim.tbl_extend("force", opts or {}, {title = "lf.nvim"})
     vim.notify(msg, level, opts)
 end
@@ -28,7 +71,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.info = function(msg, notify, opts)
+function M.info(msg, notify, opts)
     if notify then
         M.notify(msg, levels.INFO, opts)
     else
@@ -40,7 +83,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.warn = function(msg, notify, opts)
+function M.warn(msg, notify, opts)
     if notify then
         M.notify(msg, levels.WARN, opts)
     else
@@ -52,7 +95,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.err = function(msg, notify, opts)
+function M.err(msg, notify, opts)
     if notify then
         M.notify(msg, levels.ERROR, opts)
     else
@@ -62,7 +105,7 @@ end
 
 ---Helper function to derive the current git directory path
 ---@return string|nil
-M.git_dir = function()
+function M.git_dir()
     ---@diagnostic disable-next-line: missing-parameter
     local gitdir = fn.system(("git -C %s rev-parse --show-toplevel"):format(fn.expand("%:p:h")))
 
@@ -78,7 +121,7 @@ end
 ---@param lhs string keys that are bound
 ---@param rhs string|function string or lua function that is mapped to the keys
 ---@param opts table? options set for the mapping
-M.map = function(mode, lhs, rhs, opts)
+function M.map(mode, lhs, rhs, opts)
     opts = opts or {}
     opts.noremap = opts.noremap == nil and true or opts.noremap
     vim.keymap.set(mode, lhs, rhs, opts)
@@ -86,7 +129,7 @@ end
 
 ---Set the tmux statusline when opening/closing `Lf`
 ---@param disable boolean: whether the statusline is being enabled or disabled
-M.tmux = function(disable)
+function M.tmux(disable)
     if not vim.env.TMUX then
         return
     end
