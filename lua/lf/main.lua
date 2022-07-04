@@ -244,23 +244,6 @@ function Lf:__on_open(term)
             self.winid = term.window
             vim.cmd("silent doautocmd User LfTermEnter")
 
-            -- Wrap needs to be set, otherwise the window isn't aligned on resize
-            api.nvim_win_call(
-                self.winid,
-                function()
-                    vim.wo.showbreak = "NONE"
-                    vim.wo.wrap = true
-                end
-            )
-
-            if self.cfg.tmux then
-                utils.tmux(true)
-            end
-
-            if self.cfg.mappings and self.cfg.escape_quit then
-                map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
-            end
-
             -- local curr_file = api.nvim_buf_get_name(fn.bufnr("#"))
 
             if self.cfg.focus_on_open then
@@ -292,7 +275,24 @@ function Lf:__on_open(term)
                 end
             end
 
+            -- Wrap needs to be set, otherwise the window isn't aligned on resize
+            api.nvim_win_call(
+                self.winid,
+                function()
+                    vim.wo.showbreak = "NONE"
+                    vim.wo.wrap = true
+                end
+            )
+
+            if self.cfg.tmux then
+                utils.tmux(true)
+            end
+
             if self.cfg.mappings then
+                if self.cfg.escape_quit then
+                    map("t", "<Esc>", "<Cmd>q<CR>", {buffer = self.bufnr, desc = "Exit Lf"})
+                end
+
                 for key, mapping in pairs(self.cfg.default_actions) do
                     map(
                         "t",
@@ -352,19 +352,17 @@ function Lf:__callback(term)
 
     if (self.action == "cd" or self.action == "lcd") and uv.fs_stat(self.lastdir_tmpfile) then
         -- Since plenary is already being used, this is used instead of `io`
-        local last_dir =
-            with(
-            open(self.lastdir_tmpfile),
-            function(r)
-                return r:read()
+
+        utils.readFile(self.lastdir_tmpfile):thenCall(
+            function(last_dir)
+                if last_dir ~= uv.cwd() then
+                    vim.cmd(("%s %s"):format(self.action, last_dir))
+                    return
+                end
             end
         )
-
-        if last_dir ~= uv.cwd() then
-            vim.cmd(("%s %s"):format(self.action, last_dir))
-            return
-        end
     elseif uv.fs_stat(self.lf_tmpfile) then
+        -- TODO: Get this to work asynchronously
         local contents = {}
 
         for line in io.lines(self.lf_tmpfile) do
