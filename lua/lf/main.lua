@@ -50,8 +50,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
 
-local function setup_term(highlights)
-    vim.validate({highlights = {highlights, "table", true}})
+local function setup_term()
     terminal.setup(
         {
             size = function(term)
@@ -63,12 +62,11 @@ local function setup_term(highlights)
             end,
             hide_numbers = true,
             shade_filetypes = {},
-            shade_terminals = true,
+            shade_terminals = false,
             shading_factor = "1",
             start_in_insert = true,
             insert_mappings = false,
             persist_size = true,
-            highlights = highlights
         }
     )
 end
@@ -98,7 +96,7 @@ function Lf:new(config)
     -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
 
-    setup_term(self.cfg.highlights)
+    setup_term()
     self:__create_term()
 
     return self
@@ -114,12 +112,12 @@ function Lf:__create_term()
             direction = self.cfg.direction,
             winblend = self.cfg.winblend,
             close_on_exit = true,
+            highlights = self.cfg.highlights,
             float_opts = {
                 border = self.cfg.border,
                 width = math.floor(o.columns * self.cfg.width),
                 height = math.floor(o.lines * self.cfg.height),
                 winblend = self.cfg.winblend,
-                highlights = {border = "Normal", background = "Normal"}
             }
         }
     )
