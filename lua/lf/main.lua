@@ -18,6 +18,7 @@ end
 
 local api = vim.api
 local fn = vim.fn
+local fs = vim.fs
 local uv = vim.loop
 local o = vim.o
 local map = utils.map
@@ -261,17 +262,19 @@ function Lf:__on_open(term)
 
             -- local curr_file = api.nvim_buf_get_name(fn.bufnr("#"))
 
-            if self.cfg.focus_on_open and term.dir == fn.fnamemodify(self.curr_file, ":h") then
+            if self.cfg.focus_on_open and term.dir == fs.dirname(self.curr_file) then
                 local f = assert(io.open(self.id_tmpfile, "r"))
                 local data = f:read("*a")
                 f:close()
+
+                local base = fs.basename(self.curr_file)
 
                 Job:new(
                     {
                         command = "lf",
                         args = {
                             "-remote",
-                            ("send %d select %s"):format(tonumber(data), fn.fnamemodify(self.curr_file, ":t"))
+                            ("send %d select %s"):format(tonumber(data), base)
                         },
                         interactive = false,
                         detached = true,
