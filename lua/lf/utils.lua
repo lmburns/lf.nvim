@@ -50,6 +50,41 @@ function M.readFile(path)
     )
 end
 
+---@param ms number
+---@return Promise
+function M.wait(ms)
+    return promise.new(
+        function(resolve)
+            local timer = uv.new_timer()
+            timer:start(
+                ms,
+                0,
+                function()
+                    timer:close()
+                    resolve()
+                end
+            )
+        end
+    )
+end
+
+---
+---@param callback function
+---@param ms number
+---@return userdata
+function M.setTimeout(callback, ms)
+    local timer = uv.new_timer()
+    timer:start(
+        ms,
+        0,
+        function()
+            timer:close()
+            callback()
+        end
+    )
+    return timer
+end
+
 ---Echo a message with `nvim_echo`
 ---@param msg string message
 ---@param hl string highlight group

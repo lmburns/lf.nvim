@@ -18,6 +18,7 @@ end
 
 local api = vim.api
 local fn = vim.fn
+local fs = vim.fs
 local uv = vim.loop
 local o = vim.o
 local map = utils.map
@@ -53,8 +54,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
 
-local function setup_term(highlights)
-    vim.validate({highlights = {highlights, "table", true}})
+local function setup_term()
     terminal.setup(
         {
             size = function(term)
@@ -66,12 +66,11 @@ local function setup_term(highlights)
             end,
             hide_numbers = true,
             shade_filetypes = {},
-            shade_terminals = true,
+            shade_terminals = false,
             shading_factor = "1",
             start_in_insert = true,
             insert_mappings = false,
             persist_size = true,
-            highlights = highlights
         }
     )
 end
@@ -101,7 +100,7 @@ function Lf:new(config)
     -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
 
-    setup_term(self.cfg.highlights)
+    setup_term()
     self:__create_term()
 
     return self
@@ -117,12 +116,12 @@ function Lf:__create_term()
             direction = self.cfg.direction,
             winblend = self.cfg.winblend,
             close_on_exit = true,
+            highlights = self.cfg.highlights,
             float_opts = {
                 border = self.cfg.border,
                 width = math.floor(o.columns * self.cfg.width),
                 height = math.floor(o.lines * self.cfg.height),
                 winblend = self.cfg.winblend,
-                highlights = {border = "Normal", background = "Normal"}
             }
         }
     )
@@ -195,6 +194,7 @@ function Lf:__open_in(path)
 
             self.term.dir = path:absolute()
             self.curr_file = fn.expand("%:p")
+            curr_file = fn.expand("%:p")
         end
     )
 end
@@ -244,6 +244,9 @@ function Lf:__on_open(term)
             self.winid = term.window
             vim.cmd("silent doautocmd User LfTermEnter")
 
+            -- Bring into scope.
+            -- I believe this prioritizes this asynchronous code since it is needed first
+            local cfile = self.curr_file
             -- local curr_file = api.nvim_buf_get_name(fn.bufnr("#"))
 
             if self.cfg.focus_on_open then
@@ -253,7 +256,9 @@ function Lf:__on_open(term)
                             "Please report an issue on Github (lmburns/lf.nvim)",
                         utils.levels.WARN
                     )
-                elseif term.dir == fn.fnamemodify(self.curr_file, ":h") then
+                elseif term.dir == fs.dirname(self.curr_file) then
+                    local base = fs.basename(cfile)
+
                     utils.readFile(self.id_tmpfile):thenCall(
                         function(d)
                             self.id = tonumber(vim.trim(d))
@@ -263,7 +268,7 @@ function Lf:__on_open(term)
                                     command = "lf",
                                     args = {
                                         "-remote",
-                                        ("send %d select %s"):format(self.id, fn.fnamemodify(self.curr_file, ":t"))
+                                        ("send %d select %s"):format(self.id, base)
                                     },
                                     interactive = false,
                                     detached = true,

@@ -46,7 +46,11 @@ local function init()
         focus_on_open = true,
         mappings = true,
         tmux = false,
-        highlights = {},
+        highlights = {
+            -- There is an error indexing the attribute
+            NormalFloat = {},
+            FloatBorder = {}
+        },
         -- Layout configurations
         layout_mapping = "<A-u>",
         views = {
