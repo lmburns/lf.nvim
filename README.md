@@ -167,10 +167,10 @@ The mappings that are listed in the `setup` call above are the default bindings.
 * `<A-u>` = resize the floating window
 
 ### Notes
-* Until a custom filetype can be set, a global variable `vim.g.inside_lf` is used to indicate that the file manager is running
+The `autocmd` `LfTermEnter` is fired when the terminal buffer first opens
 
 ### TODO
-- [ ] Set custom filetype (filetype inheritance?)
+- [ ] Set custom filetype
 - [ ] `:LfToggle` command
 - [ ] Save previous size when terminal is closed, so it is restored on open
 - [ ] Set Lualine to `Lf` title
