@@ -1,7 +1,5 @@
 local M = {}
 
--- This was taken from toggleterm.nvim
-
 local fn = vim.fn
 local api = vim.api
 local levels = vim.log.levels
@@ -10,7 +8,7 @@ local o = vim.o
 ---Echo a message with `nvim_echo`
 ---@param msg string message
 ---@param hl string highlight group
-M.echomsg = function(msg, hl)
+function M.echomsg(msg, hl)
     hl = hl or "Title"
     api.nvim_echo({{msg, hl}}, true, {})
 end
@@ -19,7 +17,7 @@ end
 ---@param msg string
 ---@param level number
 ---@param opts table?
-M.notify = function(msg, level, opts)
+function M.notify(msg, level, opts)
     opts = vim.tbl_extend("force", opts or {}, {title = "lf.nvim"})
     vim.notify(msg, level, opts)
 end
@@ -28,7 +26,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.info = function(msg, notify, opts)
+function M.info(msg, notify, opts)
     if notify then
         M.notify(msg, levels.INFO, opts)
     else
@@ -40,7 +38,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.warn = function(msg, notify, opts)
+function M.warn(msg, notify, opts)
     if notify then
         M.notify(msg, levels.WARN, opts)
     else
@@ -52,7 +50,7 @@ end
 ---@param msg string
 ---@param notify boolean?
 ---@param opts table?
-M.err = function(msg, notify, opts)
+function M.err(msg, notify, opts)
     if notify then
         M.notify(msg, levels.ERROR, opts)
     else
@@ -62,7 +60,7 @@ end
 
 ---Helper function to derive the current git directory path
 ---@return string|nil
-M.git_dir = function()
+function M.git_dir()
     ---@diagnostic disable-next-line: missing-parameter
     local gitdir = fn.system(("git -C %s rev-parse --show-toplevel"):format(fn.expand("%:p:h")))
 
@@ -78,7 +76,7 @@ end
 ---@param lhs string keys that are bound
 ---@param rhs string|function string or lua function that is mapped to the keys
 ---@param opts table? options set for the mapping
-M.map = function(mode, lhs, rhs, opts)
+function M.map(mode, lhs, rhs, opts)
     opts = opts or {}
     opts.noremap = opts.noremap == nil and true or opts.noremap
     vim.keymap.set(mode, lhs, rhs, opts)
@@ -86,7 +84,7 @@ end
 
 ---Set the tmux statusline when opening/closing `Lf`
 ---@param disable boolean: whether the statusline is being enabled or disabled
-M.tmux = function(disable)
+function M.tmux(disable)
     if not vim.env.TMUX then
         return
     end
@@ -153,6 +151,27 @@ function M.get_view(opts, bufnr, signcolumn)
         width = width,
         height = height
     }
+end
+
+M.fs = {}
+
+---Return basename of the given file entry
+---
+---@param file string: File or directory
+---@return string: Basename of `file`
+function M.fs.basename(file)
+    return fn.fnamemodify(file, ":t")
+end
+
+---Return parent directory of the given file entry
+---
+---@param file string: File or directory
+---@return string?: Parent directory of file
+function M.fs.dirname(file)
+  if file == nil then
+    return nil
+  end
+  return fn.fnamemodify(file, ':h')
 end
 
 return M

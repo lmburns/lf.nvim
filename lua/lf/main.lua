@@ -18,9 +18,9 @@ end
 
 local api = vim.api
 local fn = vim.fn
-local fs = vim.fs
 local uv = vim.loop
 local o = vim.o
+local fs = utils.fs
 local map = utils.map
 
 ---Error for this program

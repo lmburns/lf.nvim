@@ -25,10 +25,7 @@ use(
 
           vim.keymap.set("n", "<C-o>", ":Lf<CR>")
         end,
-        requires = {
-            "plenary.nvim",
-            "toggleterm.nvim"
-        }
+        requires = {"plenary.nvim", "toggleterm.nvim"}
     }
 )
 ```
@@ -174,3 +171,4 @@ The `autocmd` `LfTermEnter` is fired when the terminal buffer first opens
 - [ ] `:LfToggle` command
 - [ ] Save previous size when terminal is closed, so it is restored on open
 - [ ] Set Lualine to `Lf` title
+- [ ] Fix weird wrapping error that occurs every so often when moving down a list of files
