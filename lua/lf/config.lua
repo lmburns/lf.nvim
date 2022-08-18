@@ -48,7 +48,7 @@ local function init()
         tmux = false,
         highlights = {
             -- There is an error indexing the attribute
-            NormalFloat = {},
+            NormalFloat = {link = "Normal"},
             FloatBorder = {}
         },
         -- Layout configurations
@@ -64,7 +64,7 @@ local function init()
         }
     }
 
-    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
+    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts) --[[@as Config]]
     lf._cfg = nil
 end
 
@@ -77,7 +77,7 @@ init()
 ---@return Config
 function Config:set(cfg)
     if cfg and type(cfg) == "table" then
-        self = vim.tbl_deep_extend("force", self, cfg or {})
+        self = vim.tbl_deep_extend("force", self, cfg or {}) --[[@as Config]]
 
         vim.validate(
             {
@@ -103,9 +103,9 @@ function Config:set(cfg)
 
         -- Just run `tonumber` on all items that can be strings
         -- Checking if each one is a string might take longer
-        self.winblend = tonumber(self.winblend)
-        self.height = tonumber(self.height)
-        self.width = tonumber(self.width)
+        self.winblend = tonumber(self.winblend) --[[@as number]]
+        self.height = tonumber(self.height) --[[@as number]]
+        self.width = tonumber(self.width) --[[@as number]]
     end
 
     return self

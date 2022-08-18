@@ -67,7 +67,7 @@ local function setup_term()
             shading_factor = "1",
             start_in_insert = true,
             insert_mappings = false,
-            persist_size = true,
+            persist_size = true
         }
     )
 end
@@ -118,7 +118,7 @@ function Lf:__create_term()
                 border = self.cfg.border,
                 width = math.floor(o.columns * self.cfg.width),
                 height = math.floor(o.lines * self.cfg.height),
-                winblend = self.cfg.winblend,
+                winblend = self.cfg.winblend
             }
         }
     )
@@ -145,8 +145,8 @@ function Lf:start(path)
     self.term:open()
 end
 
----Toggle `Lf` on and off
----@param path string
+-- ---Toggle `Lf` on and off
+-- ---@param path string
 -- function Lf:toggle(path)
 --     -- TODO:
 -- end
@@ -157,7 +157,7 @@ end
 ---@param path string
 ---@return Lf
 function Lf:__open_in(path)
-    path =
+    local built =
         Path:new(
         (function(dir)
             if dir == "gwd" then
@@ -173,16 +173,16 @@ function Lf:__open_in(path)
         end)(path)
     )
 
-    if not path:exists() then
+    if not built:exists() then
         utils.info("Current file doesn't exist", true)
     end
 
     -- Should be fine, but just checking
-    if not path:is_dir() then
-        path = path:parent()
+    if not built:is_dir() then
+        built = built:parent()
     end
 
-    self.term.dir = path:absolute()
+    self.term.dir = built:absolute()
     self.curr_file = fn.expand("%:p")
 
     return self
