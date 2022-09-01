@@ -274,7 +274,7 @@ function Lf:__on_open(term)
                         command = "lf",
                         args = {
                             "-remote",
-                            ("send %d select %s"):format(tonumber(data), base)
+                            ("send %s select %s"):format(data, base)
                         },
                         interactive = false,
                         detached = true,
