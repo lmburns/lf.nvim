@@ -1,7 +1,5 @@
 local M = {}
 
--- This was taken from toggleterm.nvim
-
 local fn = vim.fn
 local api = vim.api
 local levels = vim.log.levels
@@ -33,7 +31,9 @@ end
 M.open = wrap("fs_open", 4)
 M.close = wrap("fs_close", 2)
 M.read = wrap("fs_read", 4)
+M.write = wrap("fs_write", 4)
 M.fstat = wrap("fs_fstat", 2)
+M.rename = wrap("fs_rename", 3)
 
 ---
 ---@param path string file path to read
@@ -46,6 +46,35 @@ function M.readFile(path)
             local data = await(M.read(fd, stat.size, 0))
             await(M.close(fd))
             return data
+        end
+    )
+end
+
+---Write to a file asynchronously (using Promises)
+---@param path string
+---@param data string
+---@return Promise
+function M.writeFile(path, data)
+    return async(
+        function()
+            local path_ = path .. "_"
+            local fd = await(M.open(path_, "w", 438))
+            await(M.write(fd, data))
+            await(M.close(fd))
+            await(M.rename(path_, path))
+        end
+    )
+end
+
+---@param path string
+---@param data string
+---@return Promise
+function M.appendFile(path, data)
+    return async(
+        function()
+            local fd = await(M.open(path, "a+", 438))
+            await(M.write(fd, data))
+            await(M.close(fd))
         end
     )
 end
@@ -83,6 +112,37 @@ function M.setTimeout(callback, ms)
         end
     )
     return timer
+end
+
+---Return a value based on two values
+---@generic T, V
+---@param condition boolean|nil Statement to be tested
+---@param is_if T Return if condition is truthy
+---@param is_else V Return if condition is not truthy
+---@return T|V
+M.tern = function(condition, is_if, is_else)
+    if condition then
+        return is_if
+    else
+        return is_else
+    end
+end
+
+---Similar to `vim.F.nil` except that an alternate default value can be given
+---@param x any: Value to check if `nil`
+---@param is_nil any: Value to return if `x` is `nil`
+---@param is_not_nil any: Value to return if `x` is not `nil`
+M.ife_nil = function(x, is_nil, is_not_nil)
+    return F.tern(x == nil, is_nil, is_not_nil)
+end
+
+---Return a default value if `x` is nil
+---@generic T, V
+---@param x T: Value to check if not `nil`
+---@param default V: Default value to return if `x` is `nil`
+---@return T|V
+M.get_default = function(x, default)
+    return M.ife_nil(x, default, x)
 end
 
 ---Echo a message with `nvim_echo`
@@ -231,6 +291,28 @@ function M.get_view(opts, bufnr, signcolumn)
         width = width,
         height = height
     }
+end
+
+---Module to replace the new `vim.fs` if it isn't available
+M.fs = {}
+
+---Return basename of the given file entry
+---
+---@param file string: File or directory
+---@return string: Basename of `file`
+function M.fs.basename(file)
+    return fn.fnamemodify(file, ":t")
+end
+
+---Return parent directory of the given file entry
+---
+---@param file string: File or directory
+---@return string?: Parent directory of file
+function M.fs.dirname(file)
+    if file == nil then
+        return nil
+    end
+    return fn.fnamemodify(file, ":h")
 end
 
 return M

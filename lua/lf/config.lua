@@ -14,8 +14,11 @@
 --- @field tmux boolean: whether tmux statusline should be changed by this plugin
 --- @field highlights table: highlight table to pass to `toggleterm`
 --- @field layout_mapping string: keybinding to rotate through the window layouts
---- @field views table: table of layouts to be applied to `nvim_win_set_config`
+--- @field presets {width?: integer, height?: integer}: table of layouts to be applied to `nvim_win_set_config`
+--- @field layout table: initial window options
 local Config = {}
+
+local utils = require("lf.utils")
 
 local fn = vim.fn
 local o = vim.o
@@ -25,7 +28,7 @@ local o = vim.o
 --- Initialize the default configuration
 local function init()
     local lf = require("lf")
-    vim.validate({Config = {lf._cfg, "table", true}})
+    vim.validate({Config = {lf._cfg, "t", true}})
 
     local opts = {
         default_cmd = "lf",
@@ -53,18 +56,27 @@ local function init()
         },
         -- Layout configurations
         layout_mapping = "<A-u>",
-        views = {
+        presets = {
             {width = 0.600, height = 0.600},
+            {},
             {
-                width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
-                height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines
+                width = 1.0 * fn.float2nr(utils.round(0.7 * o.columns)) / o.columns,
+                height = 1.0 * fn.float2nr(utils.round(0.7 * o.lines)) / o.lines
             },
             {width = 0.800, height = 0.800},
             {width = 0.950, height = 0.950}
+        },
+        layout = {
+            relative = "editor",
+            width = fn.float2nr(utils.round(0.7 * o.columns)),
+            height = fn.float2nr(utils.round(0.7 * o.lines)),
+            col = fn.float2nr(utils.round(0.15 * o.columns)),
+            row = fn.float2nr(utils.round(0.15 * o.lines)),
+            style = "minimal"
         }
     }
 
-    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts)
+    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts) --[[@as Config]]
     lf._cfg = nil
 end
 
@@ -97,7 +109,7 @@ function Config:set(cfg)
                 highlights = {self.highlights, "t", false},
                 -- Layout configurations
                 layout_mapping = {self.layout_mapping, "s", false},
-                views = {self.views, "t", false}
+                presets = {self.presets, "t", false}
             }
         )
 

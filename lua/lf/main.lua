@@ -3,6 +3,8 @@ local M = {}
 ---@diagnostic disable: redefined-local
 
 local utils = require("lf.utils")
+local ctx = require("lf.context")
+local log = require("lf.log")
 
 local res, terminal = pcall(require, "toggleterm")
 if not res then
@@ -18,9 +20,9 @@ end
 
 local api = vim.api
 local fn = vim.fn
-local fs = vim.fs
 local uv = vim.loop
 local o = vim.o
+local fs = utils.fs
 local map = utils.map
 
 local promise = require("promise")
@@ -31,8 +33,9 @@ M.error = nil
 
 local Job = require("plenary.job")
 local Config = require("lf.config")
-local with = require("plenary.context_manager").with
-local open = require("plenary.context_manager").open
+
+-- local with = require("plenary.context_manager").with
+-- local open = require("plenary.context_manager").open
 -- local a = require("plenary.async_lib")
 -- local promise = require("promise")
 
@@ -42,7 +45,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@class Lf
 ---@field cfg Config Configuration options
 ---@field term Terminal Toggle terminal
----@field view_idx number Current index of configuration `views`
+---@field preset_idx number Current index of configuration `presets`
 ---@field winid number? `Terminal` window id
 ---@field lf_tmpfile string File path with the files to open with `lf`
 ---@field lastdir_tmpfile string File path with the last directory `lf` was in
@@ -70,7 +73,7 @@ local function setup_term()
             shading_factor = "1",
             start_in_insert = true,
             insert_mappings = false,
-            persist_size = true,
+            persist_size = true
         }
     )
 end
@@ -82,6 +85,7 @@ end
 ---@param config 'table'
 ---@return Lf
 function Lf:new(config)
+    log.debug("creating a new Lf instance")
     self.__index = self
 
     if config then
@@ -90,7 +94,7 @@ function Lf:new(config)
         self.cfg = Config
     end
 
-    self.view_idx = 1
+    self.preset_idx = 1
     self.winid = nil
     self.bufnr = 0
     self.id = nil
@@ -121,7 +125,7 @@ function Lf:__create_term()
                 border = self.cfg.border,
                 width = math.floor(o.columns * self.cfg.width),
                 height = math.floor(o.lines * self.cfg.height),
-                winblend = self.cfg.winblend,
+                winblend = self.cfg.winblend
             }
         }
     )
@@ -334,9 +338,9 @@ function Lf:__on_open(term)
                         function()
                             api.nvim_win_set_config(
                                 self.winid,
-                                utils.get_view(self.cfg.views[self.view_idx], self.bufnr, self.signcolumn)
+                                utils.get_view(self.cfg.presets[self.preset_idx], self.bufnr, self.signcolumn)
                             )
-                            self.view_idx = self.view_idx < #self.cfg.views and self.view_idx + 1 or 1
+                            self.preset_idx = self.preset_idx < #self.cfg.presets and self.preset_idx + 1 or 1
                         end
                     )
                 end
@@ -393,5 +397,31 @@ function Lf:__callback(term)
 end
 
 M.Lf = Lf
+
+function M.toggle()
+    local winid = ctx.winid()
+    if ctx.bufnr() ~= -1 then
+        if winid ~= -1 and api.nvim_win_is_valid(winid) then
+            if api.nvim_get_current_win() == winid then
+                api.nvim_win_close(winid, false)
+            else
+                api.nvim_set_current_win(winid)
+                cmd.startinsert()
+            end
+        else
+        end
+    else
+        M.init()
+    end
+end
+
+function M.init(...)
+    if ctx.bufnr() ~= -1 then
+        return
+    end
+end
+
+function M.create_lf(cmd, env, background)
+end
 
 return M
