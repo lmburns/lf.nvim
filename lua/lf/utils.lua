@@ -259,37 +259,40 @@ function M.width(bufnr, signcolumn)
     local width = #tostring(api.nvim_buf_line_count(bufnr))
     local col = vim.split(signcolumn, ":")
     if #col == 2 then
-        -- Can't cast integer to number?
-        ---@diagnostic disable-next-line:cast-local-type
         width = width + tonumber(col[2])
     end
-    ---@diagnostic disable-next-line:return-type-mismatch
-    return signcolumn:match("no") and o.columns or o.columns - width
+
+    local columns = tonumber(o.columns)
+    return signcolumn:match("no") and columns or columns - width
 end
 
 ---Get the table that is passed to `api.nvim_win_set_config`
----@param opts table
+---@param opts LfLayout
 ---@param bufnr number Buffer number from the file that Lf is opened from
 ---@param signcolumn string Signcolumn option set by the user, not the terminal buffer
 ---@return table
 function M.get_view(opts, bufnr, signcolumn)
     opts = opts or {}
-    local width =
-        opts.width or math.ceil(math.min(M.width(bufnr, signcolumn), math.max(80, M.width(bufnr, signcolumn) - 20)))
-    local height = opts.height or math.ceil(math.min(M.height(), math.max(20, M.height() - 10)))
 
-    width = fn.float2nr(width * M.width(bufnr, signcolumn))
-    height = fn.float2nr(M.round(height * M.height()))
-    local col = fn.float2nr(M.round((M.width(bufnr, signcolumn) - width) / 2))
-    local row = fn.float2nr(M.round((M.height() - height) / 2))
+    local w = M.width(bufnr, signcolumn)
+    local h = M.height()
+
+    local width = opts.width or math.ceil(math.min(w, math.max(80, w - 20)))
+    local height = opts.height or math.ceil(math.min(h, math.max(20, h - 10)))
+
+    width = fn.float2nr(width * w)
+    height = fn.float2nr(M.round(height * h))
+    local col = fn.float2nr(M.round((w - width) / 2))
+    local row = fn.float2nr(M.round((h - height) / 2))
 
     return {
-        col = col,
-        row = row,
-        relative = "editor",
         style = "minimal",
+        relative = opts.relative or "editor",
+        border = opts.border or "rounded",
+        row = opts.row or row,
+        col = opts.col or col,
         width = width,
-        height = height
+        height = height,
     }
 end
 

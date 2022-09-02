@@ -21,7 +21,7 @@ end
 local api = vim.api
 local fn = vim.fn
 local uv = vim.loop
-local o = vim.o
+local cmd = vim.cmd
 local fs = utils.fs
 local map = utils.map
 
@@ -43,7 +43,7 @@ local Config = require("lf.config")
 local Terminal = require("toggleterm.terminal").Terminal
 
 ---@class Lf
----@field cfg Config Configuration options
+---@field cfg LfConfig Configuration options
 ---@field term Terminal Toggle terminal
 ---@field preset_idx number Current index of configuration `presets`
 ---@field winid number? `Terminal` window id
@@ -62,9 +62,9 @@ local function setup_term()
         {
             size = function(term)
                 if term.direction == "horizontal" then
-                    return o.lines * 0.4
+                    return vim.o.lines * 0.4
                 elseif term.direction == "vertical" then
-                    return o.columns * 0.5
+                    return vim.o.columns * 0.5
                 end
             end,
             hide_numbers = true,
@@ -102,7 +102,7 @@ function Lf:new(config)
     self.id_tmpfile = nil
     self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
-    self.signcolumn = o.signcolumn
+    self.signcolumn = vim.o.signcolumn
 
     setup_term()
     self:__create_term()
@@ -117,15 +117,18 @@ function Lf:__create_term()
         {
             cmd = self.cfg.default_cmd,
             dir = self.cfg.dir,
-            direction = self.cfg.direction,
-            winblend = self.cfg.winblend,
+            direction = "float",
+            winblend = self.cfg.layout.winblend,
             close_on_exit = true,
             highlights = self.cfg.highlights,
             float_opts = {
-                border = self.cfg.border,
-                width = math.floor(o.columns * self.cfg.width),
-                height = math.floor(o.lines * self.cfg.height),
-                winblend = self.cfg.winblend
+                style = "minimal",
+                border = self.cfg.layout.border,
+                width = self.cfg.layout.width,
+                height = self.cfg.layout.height,
+                winblend = self.cfg.layout.winblend,
+                zindex = self.cfg.layout.zindex,
+                relative = self.cfg.layout.relative
             }
         }
     )
@@ -154,12 +157,6 @@ function Lf:start(path)
         end
     )
 end
-
----Toggle `Lf` on and off
----@param path string
--- function Lf:toggle(path)
---     -- TODO:
--- end
 
 ---@private
 ---Set the directory for `Lf` to open in
@@ -246,7 +243,7 @@ function Lf:__on_open(term)
             -- For easier reference
             self.bufnr = term.bufnr
             self.winid = term.window
-            vim.cmd("silent doautocmd User LfTermEnter")
+            cmd("silent doautocmd User LfTermEnter")
 
             -- Bring into scope.
             -- I believe this prioritizes this asynchronous code since it is needed first
@@ -336,11 +333,7 @@ function Lf:__on_open(term)
                         "t",
                         self.cfg.layout_mapping,
                         function()
-                            api.nvim_win_set_config(
-                                self.winid,
-                                utils.get_view(self.cfg.presets[self.preset_idx], self.bufnr, self.signcolumn)
-                            )
-                            self.preset_idx = self.preset_idx < #self.cfg.presets and self.preset_idx + 1 or 1
+                            self:redraw_win()
                         end
                     )
                 end
@@ -365,7 +358,7 @@ function Lf:__callback(term)
         utils.readFile(self.lastdir_tmpfile):thenCall(
             function(last_dir)
                 if last_dir ~= uv.cwd() then
-                    vim.cmd(("%s %s"):format(self.action, last_dir))
+                    cmd(("%s %s"):format(self.action, last_dir))
                     return
                 end
             end
@@ -382,7 +375,7 @@ function Lf:__callback(term)
             term:close()
 
             for _, fname in pairs(contents) do
-                vim.cmd(("%s %s"):format(self.action, Path:new(fname):absolute()))
+                cmd(("%s %s"):format(self.action, Path:new(fname):absolute()))
             end
         end
     end
@@ -398,6 +391,23 @@ end
 
 M.Lf = Lf
 
+---Redraw the window size, cycling though `LfConfig.presets`
+function Lf:redraw_win()
+    local preset = self.cfg.presets[self.preset_idx]
+    local layout = vim.tbl_deep_extend("force", self.cfg.layout, preset)
+
+    local view = utils.get_view(layout, self.bufnr, self.signcolumn)
+    api.nvim_win_set_config(self.winid, view)
+    self.preset_idx = self.preset_idx < #self.cfg.presets and self.preset_idx + 1 or 1
+    vim.defer_fn(
+        function()
+            -- Clear and redraw the screen
+            cmd("mode")
+        end,
+        1
+    )
+end
+
 function M.toggle()
     local winid = ctx.winid()
     if ctx.bufnr() ~= -1 then
@@ -406,7 +416,7 @@ function M.toggle()
                 api.nvim_win_close(winid, false)
             else
                 api.nvim_set_current_win(winid)
-                cmd.startinsert()
+                cmd("startinsert")
             end
         else
         end
@@ -415,11 +425,11 @@ function M.toggle()
     end
 end
 
-function M.init(...)
-    if ctx.bufnr() ~= -1 then
-        return
-    end
-end
+-- function M.init(...)
+--     if ctx.bufnr() ~= -1 then
+--         return
+--     end
+-- end
 
 function M.create_lf(cmd, env, background)
 end

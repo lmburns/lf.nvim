@@ -10,6 +10,8 @@ local function has_feature(cfg)
     end
 end
 
+---Setup the plugin
+---@param cfg LfConfig
 function M.setup(cfg)
     if loaded then
         return
@@ -26,9 +28,10 @@ end
 ---@param path string optional path to start in
 function M.start(path, cfg)
     -- Only one argument was given
+    local Lf = require("lf.main").Lf
 
     if path and cfg == nil and type(path) == "table" then
-        require("lf.main").Lf:new(path or M._cfg):start(nil)
+        Lf:new(path or M._cfg):start(nil)
     else
         if cfg ~= nil and type(path) ~= "string" then
             utils.err("first argument must be a string", true)
@@ -39,7 +42,7 @@ function M.start(path, cfg)
             return
         end
 
-        require("lf.main").Lf:new(cfg or M._cfg):start(path)
+        Lf:new(cfg or M._cfg):start(path)
     end
 end
 
