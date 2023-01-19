@@ -37,7 +37,7 @@ REQUIREMENTS                                            *lf-requirements*
 
 INSTALLATION                                            *lf-installation*
 
-Requires *lf* to be installed. The installation instructions for *lf* can be
+Requires lf to be installed. The installation instructions for lf can be
 found here <https://github.com/gokcehan/lf#installation>.
 
 A sample installation is given.
