@@ -47,8 +47,7 @@ local function init()
         mappings = true,
         tmux = false,
         highlights = {
-            -- There is an error indexing the attribute
-            NormalFloat = {link = "Normal"},
+            Normal = {link = "Normal"},
             FloatBorder = {}
         },
         -- Layout configurations

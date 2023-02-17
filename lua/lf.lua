@@ -24,13 +24,17 @@ end
 ---`nil` can be used as the first parameter to change options and open in CWD
 ---
 ---@param path string optional path to start in
+---@param cfg table
 function M.start(path, cfg)
-    -- Only one argument was given
+    local path_t = type(path)
 
-    if path and cfg == nil and type(path) == "table" then
+    -- Only one argument was given
+    -- `path` is given as a table, which is treated as `cfg`
+    if path ~= nil and cfg == nil and path_t == "table" then
         require("lf.main").Lf:new(path or M._cfg):start(nil)
     else
-        if cfg ~= nil and type(path) ~= "string" then
+        -- Strict nil checks are needed because `nil` can be given as an argument
+        if path ~= nil and path_t ~= "string" then
             utils.err("first argument must be a string", true)
             return
         end
