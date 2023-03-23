@@ -1,20 +1,37 @@
---- @class Config
---- @field default_cmd string: default `lf` command
---- @field default_action string: default action when `Lf` opens a file
---- @field default_actions table: default action keybindings
---- @field winblend number: psuedotransparency level
---- @field dir string: directory where `lf` starts ('gwd' is git-working-directory, "" is CWD)
---- @field direction string: window type: float horizontal vertical
---- @field border string: border kind: single double shadow curved
---- @field height number: height of the *floating* window
---- @field width number: width of the *floating* window
---- @field escape_quit boolean: whether escape should be mapped to quit
---- @field focus_on_open boolean: whether Lf should open focused on current file
---- @field mappings boolean: whether terminal buffer mappings should be set
---- @field tmux boolean: whether tmux statusline should be changed by this plugin
---- @field highlights table: highlight table to pass to `toggleterm`
---- @field layout_mapping string: keybinding to rotate through the window layouts
---- @field views table: table of layouts to be applied to `nvim_win_set_config`
+---@alias LfBorder 'none'|'single'|'double'|'rounded'|'solid'|'shadow'|string[8]
+---@class LfViews
+---@field relative 'editor'|'win'|'curosr'|'mouse'
+---@field win number: For `relative='win'`
+---@field anchor 'NW'|'NE'|'SW'|'SE': Which corner of float to place `(row, col)`
+---@field width number
+---@field height number
+---@field bufpos { row: number, col: number }
+---@field row number|float
+---@field col number|float
+---@field focusable boolean
+---@field zindex number
+---@field style 'minimal'
+---@field border LfBorder: Border kind
+---@field title string|string[2][]: Can be a string or an array of tuples
+---@field title_pos 'left'|'center'|'right'
+---@field noautocmd boolean
+---@class LfConfig
+---@field default_cmd string: Default `lf` command
+---@field default_action string: Default action when `Lf` opens a file
+---@field default_actions { [string]: string }: Default action keybindings
+---@field winblend number: Psuedotransparency level
+---@field dir 'gwd'|''|nil|string: Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
+---@field direction 'vertical'|'horizontal'|'tab'|'float': Window type
+---@field border LfBorder: Border kind
+---@field height number: Height of the *floating* window
+---@field width number: Width of the *floating* window
+---@field escape_quit boolean: Whether escape should be mapped to quit
+---@field focus_on_open boolean: Whether Lf should open focused on current file
+---@field mappings boolean: Whether terminal buffer mappings should be set
+---@field tmux boolean: Whether `tmux` statusline should be changed by this plugin
+---@field highlights table<string, table<string, string>>: Highlight table passed to `toggleterm`
+---@field layout_mapping string: Keybinding to rotate through the window layouts
+---@field views LfViews[]: Table of layouts to be applied to `nvim_win_set_config`
 local Config = {}
 
 local fn = vim.fn
@@ -22,11 +39,13 @@ local o = vim.o
 
 -- A local function that runs each time allows for a global `.setup()` to work
 
---- Initialize the default configuration
+---@private
+---Initialize the default configuration
 local function init()
     local lf = require("lf")
     vim.validate({Config = {lf._cfg, "table", true}})
 
+    ---@type LfConfig
     local opts = {
         default_cmd = "lf",
         default_action = "edit",
@@ -63,7 +82,8 @@ local function init()
         }
     }
 
-    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts) --[[@as Config]]
+    -- Keep options from the `lf.setup()` call
+    Config = vim.tbl_deep_extend("keep", lf._cfg or {}, opts) --[[@as LfConfig]]
     lf._cfg = nil
 end
 
@@ -72,11 +92,11 @@ init()
 -- local notify = require("lf.utils").notify
 
 ---Set a configuration passed as a function argument (not through `setup`)
----@param cfg table configuration options
----@return Config
+---@param cfg? LfConfig configuration options
+---@return LfConfig
 function Config:set(cfg)
     if cfg and type(cfg) == "table" then
-        self = vim.tbl_deep_extend("force", self, cfg or {}) --[[@as Config]]
+        self = vim.tbl_deep_extend("keep", cfg or {}, self) --[[@as LfConfig]]
 
         vim.validate(
             {
@@ -111,8 +131,8 @@ function Config:set(cfg)
 end
 
 ---Get the entire configuration if empty, else get the given key
----@param key string? option to get
----@return Config
+---@param key? string option to get
+---@return LfConfig|any
 function Config:get(key)
     if key then
         return self[key]
@@ -121,8 +141,7 @@ function Config:get(key)
 end
 
 return setmetatable(
-    Config,
-    {
+    Config, {
         __index = function(this, k)
             return this[k]
         end,
