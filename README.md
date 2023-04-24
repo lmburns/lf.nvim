@@ -19,6 +19,7 @@ use(
               {
                   escape_quit = false,
                   border = "rounded",
+                  -- assuming "kimbox.palette" is available, if not use another value
                   highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
               }
           )
