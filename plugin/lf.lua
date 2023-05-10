@@ -11,13 +11,9 @@ local cmd = vim.cmd
 
 _G.loaded_lf = 1
 
-api.nvim_create_user_command(
-    "Lf",
-    function(tbl)
-        require("lf").start(tbl.args)
-    end,
-    {nargs = "*", complete = "file"}
-)
+api.nvim_create_user_command("Lf", function(tbl)
+    require("lf").start(tbl.args)
+end, {nargs = "*", complete = "file"})
 
 if vim.g.lf_netrw == 1 or vim.g.lf_netrw then
     local group = api.nvim_create_augroup("ReplaceNetrwWithLf", {clear = true})

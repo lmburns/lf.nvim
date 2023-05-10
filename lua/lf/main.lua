@@ -35,6 +35,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@field action string The current action to open the file
 ---@field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
+Lf.__index = Lf
 
 ---@private
 ---Setup `toggleterm`'s `Terminal`
@@ -65,8 +66,6 @@ end
 ---@param config? LfConfig
 ---@return Lf
 function Lf:new(config)
-    self.__index = self
-
     if config then
         self.cfg = Config:override(config)
     else
@@ -177,7 +176,6 @@ end
 ---On open closure to run in the `Terminal`
 ---@param term Terminal
 function Lf:__on_open(term)
-    -- For easier reference
     self.bufnr = term.bufnr
     self.winid = term.window
 
@@ -185,7 +183,7 @@ function Lf:__on_open(term)
     --       I need to find a way to block this outer function's caller
     vim.defer_fn(function()
         if self.cfg.focus_on_open then
-            if term.dir == fs.dirname(self.curfile) then
+            if self.term.dir == fs.dirname(self.curfile) then
                 if not fn.filereadable(self.tmp_id) then
                     utils.err(("Lf's id file is not readable: %s"):format(self.tmp_id))
                     return
@@ -208,10 +206,12 @@ function Lf:__on_open(term)
     cmd("silent! doautocmd User LfTermEnter")
 
     -- Wrap needs to be set, otherwise the window isn't aligned on resize
-    api.nvim_buf_call(self.bufnr, function()
-        vim.wo[self.winid].showbreak = "NONE"
-        vim.wo[self.winid].wrap = true
-        vim.wo[self.winid].sidescrolloff = 0
+    api.nvim_win_call(self.winid, function()
+        vim.wo.showbreak = "NONE"
+        vim.wo.wrap = true
+        vim.wo.sidescrolloff = 0
+        vim.wo.scrolloff = 0
+        vim.wo.scrollbind = false
     end)
 
     if self.cfg.tmux then
@@ -230,38 +230,30 @@ function Lf:__on_open(term)
         end
 
         for key, mapping in pairs(self.cfg.default_actions) do
-            map(
-                "t",
-                key,
-                function()
-                    -- Change default_action for easier reading in the callback
-                    self.action = mapping
+            map("t", key, function()
+                -- Change default_action for easier reading in the callback
+                self.action = mapping
 
-                    -- Manually tell `lf` to open the current file
-                    -- since Neovim has hijacked the binding
-                    fn.system({"lf", "-remote", ("send %d open"):format(self.id)})
-                end,
-                {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)}
-            )
+                if not self.id then
+                    local res = utils.read_file(self.tmp_id)
+                    self.id = tonumber(res)
+                end
+
+                fn.system({"lf", "-remote", ("send %d open"):format(self.id)})
+            end, {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)})
         end
 
         if self.cfg.layout_mapping then
-            map(
-                "t",
-                self.cfg.layout_mapping,
-                function()
-                    api.nvim_win_set_config(
-                        self.winid,
-                        utils.get_view(
-                            self.cfg.views[self.view_idx],
-                            self.bufnr,
-                            self.signcolumn
-                        ))
-                    self.view_idx = self.view_idx < #self.cfg.views
-                        and self.view_idx + 1
-                        or 1
-                end
-            )
+            map("t", self.cfg.layout_mapping, function()
+                api.nvim_win_set_config(self.winid, utils.get_view(
+                    self.cfg.views[self.view_idx],
+                    self.bufnr,
+                    self.signcolumn
+                ))
+                self.view_idx = self.view_idx < #self.cfg.views
+                    and self.view_idx + 1
+                    or 1
+            end)
         end
     end
 end
@@ -270,7 +262,7 @@ end
 ---A callback for the `Terminal`
 ---
 ---@param term Terminal
-function Lf:__callback(term)
+function Lf:__callback(_term)
     if self.cfg.tmux then
         utils.tmux(false)
     end
@@ -281,7 +273,7 @@ function Lf:__callback(term)
     then
         local last_dir = utils.read_file(self.tmp_lastdir)
         if last_dir ~= nil and last_dir ~= uv.cwd() then
-            cmd(("%s %s"):format(self.action, last_dir))
+            cmd(("%s %s"):format(self.action, fn.fnameescape(last_dir)))
             return
         end
     elseif uv.fs_stat(self.tmp_sel) then
@@ -290,12 +282,12 @@ function Lf:__callback(term)
             table.insert(contents, line)
         end
 
-        if not vim.tbl_isempty(contents) then
-            term:close()
+        if #contents > 0 then
+            -- term:close()
             for _, fname in pairs(contents) do
                 local stat = uv.fs_stat(fname)
                 if type(stat) == "table" then
-                    cmd(("%s %s"):format(self.action, fname))
+                    cmd(("%s %s"):format(self.action, fn.fnameescape(fname)))
                 end
             end
         end
