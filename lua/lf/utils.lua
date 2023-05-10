@@ -1,5 +1,6 @@
 local M = {}
 
+local uv = vim.loop
 local fn = vim.fn
 local api = vim.api
 local levels = vim.log.levels
@@ -18,9 +19,7 @@ end
 ---@param level number
 ---@param opts table?
 function M.notify(msg, level, opts)
-    opts = vim.tbl_extend(
-        "force", opts or {}, {title = "lf.nvim"}
-    )
+    opts = vim.tbl_extend("force", opts or {}, {title = "lf.nvim"})
     vim.notify(msg, level, opts)
 end
 
@@ -60,62 +59,104 @@ function M.err(msg, print, opts)
     end
 end
 
----Return a value based on two values
----@generic T, V
----@param condition? boolean Statement to be tested
----@param is_if T Return if condition is truthy
----@param is_else V Return if condition is not truthy
----@return T | V
-function M.tern(condition, is_if, is_else)
-    if condition then
-        return is_if
+---Create a shallow copy of a portion of a vector.
+---Can index with negative numbers.
+---@generic T
+---@param vec T[] Vector to select from
+---@param first? integer First index, inclusive
+---@param last? integer Last index, inclusive
+---@return T[] #sliced vector
+function M.list_slice(vec, first, last)
+    local slice = {}
+    if first and first < 0 then
+        first = #vec + first + 1
     end
-    return is_else
+    if last and last < 0 then
+        last = #vec + last + 1
+    end
+    for i = first or 1, last or #vec do
+        table.insert(slice, vec[i])
+    end
+
+    return slice
 end
 
----Similar to `vim.F.nil` except that an alternate default value can be given
+---Return all elements in `t` between `first` and `last` index.
+---Can index with negative numbers.
+---@generic T
+---@param vec T[] Vector to select from
+---@param first? integer First index, inclusive
+---@param last? integer Last index, inclusive
+---@return T ...
+function M.list_select(vec, first, last)
+    return unpack(M.list_slice(vec, first, last))
+end
+
+---Similar to C's ternary operator
 ---@generic T, V
----@param x any: Value to check if `nil`
----@param is_nil `T`: Value to return if `x` is `nil`
----@param is_not_nil `V`: Value to return if `x` is not `nil`
----@return `T` | `V`
-function M.ife_nil(x, is_nil, is_not_nil)
-    return M.tern(x == nil, is_nil, is_not_nil)
-end
-
----Return a default value if `x` is nil
----@generic T, V
----@param x `T`: Value to check if not `nil`
----@param default `V`: Default value to return if `x` is `nil`
----@return `T` | `V`
-function M.get_default(x, default)
-    return M.ife_nil(x, default, x)
-end
-
----Read a file
----@param fname string
----@return string?
-function M.read_file(fname)
-    local fd = assert(io.open(fname, "r"))
-    local c = coroutine.create(
-        function()
-            coroutine.yield(fd)
-            fd:close()
+---@param cond? boolean|fun():boolean Statement to be tested
+---@param is_if T Return if cond is truthy
+---@param is_else V Return if cond is not truthy
+---@param simple? boolean Never treat `is_if` and `is_else` as arg lists
+---@return unknown
+function M.tern(cond, is_if, is_else, simple)
+    if cond then
+        if not simple and type(is_if) == "table" and vim.is_callable(is_if[1]) then
+            return is_if[1](M.list_select(is_if, 2))
         end
-    )
+        return is_if
+    else
+        if not simple and type(is_else) == "table" and vim.is_callable(is_else[1]) then
+            return is_else[1](M.list_select(is_else, 2))
+        end
+        return is_else
+    end
+end
 
-    local ok, context = coroutine.resume(c)
-    assert(ok, "coroutine didn't yield")
+---## if else nil
+---Similar to `vim.F.nil` except that:
+---   - a default value can be given
+---   - `if cond == nil then want else default`
+---@generic T, V
+---@param cond any Value to check if `nil`
+---@param is_nil T Value to return if `cond` is `nil`
+---@param is_not_nil V Value to return if `cond` is not `nil`
+---@return T | V
+function M.ife_nil(cond, is_nil, is_not_nil)
+    return M.tern(cond == nil, is_nil, is_not_nil)
+end
 
-    local _, res = pcall(
-        function()
-            return fd:read("*a")
-        end, context
-    )
+---## if nil then
+---Return a default value if `val` is nil
+---   - `if val == nil then default else val`
+---   - `ifn_then`
+---@generic T, V
+---@param val T value to check if `nil`
+---@param default V default value to return if `val` is `nil`
+---@return T | V
+function M.unwrap_or(val, default)
+    if type(val) ~= "table" then
+        return M.ife_nil(val, default, val)
+    end
+    val = vim.deepcopy(val or {})
+    for k, v in pairs(default) do
+        if val[k] == nil then
+            val[k] = v
+        end
+    end
+    return val
+end
 
-    local done, _ = coroutine.resume(c)
-    assert(done, "coroutine didn't complete")
-    return res
+---@param path string
+---@return uv_fs_t|string
+---@return uv.aliases.fs_stat_table?
+function M.read_file(path)
+    -- tonumber(444, 8) == 292
+    local fd = assert(uv.fs_open(fn.expand(path), "r", 292))
+    local stat = assert(uv.fs_fstat(fd))
+    local buffer = assert(uv.fs_read(fd, stat.size, 0))
+    uv.fs_close(fd)
+    return buffer, stat
 end
 
 ---Create a neovim keybinding
@@ -173,7 +214,7 @@ function M.get_view(opts, bufnr, signcolumn)
         )
     )
     local height = opts.height
-                       or math.ceil(
+        or math.ceil(
             math.min(M.height(), math.max(20, M.height() - 10))
         )
 
@@ -188,7 +229,7 @@ function M.get_view(opts, bufnr, signcolumn)
         relative = "editor",
         style = "minimal",
         width = width,
-        height = height
+        height = height,
     }
 end
 

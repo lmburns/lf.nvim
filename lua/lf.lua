@@ -20,22 +20,22 @@ function M.setup(cfg)
     end
 
     has_feature(cfg)
-    M._cfg = cfg or {}
+    M.__conf = cfg or {}
     loaded = true
 end
 
 ---Start the file manager
 ---`nil` can be used as the first parameter to change options and open in CWD
----
 ---@param path string optional path to start in
 ---@param cfg LfConfig
 function M.start(path, cfg)
     local path_t = type(path)
+    local Lf = require("lf.main")
 
     -- Only one argument was given
     -- `path` is given as a table, which is treated as `cfg`
     if path ~= nil and cfg == nil and path_t == "table" then
-        require("lf.main").Lf:new(path or M._cfg):start(nil)
+        Lf:new(path or M.__conf):start(nil)
     else
         -- Strict nil checks are needed because `nil` can be given as an argument
         if path ~= nil and path_t ~= "string" then
@@ -47,7 +47,7 @@ function M.start(path, cfg)
             return
         end
 
-        require("lf.main").Lf:new(cfg or M._cfg):start(path)
+        Lf:new(cfg or M.__conf):start(path)
     end
 end
 

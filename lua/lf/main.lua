@@ -1,18 +1,8 @@
-local M = {}
-
----@diagnostic disable: redefined-local
-
 local utils = require("lf.utils")
 
-local res, terminal = pcall(require, "toggleterm")
-if not res then
+local ok, terminal = pcall(require, "toggleterm")
+if not ok then
     utils.err("toggleterm.nvim must be installed to use this program")
-    return
-end
-
-local res, Path = pcall(require, "plenary.path")
-if not res then
-    utils.err("plenary must be installed to use this program")
     return
 end
 
@@ -24,14 +14,9 @@ local o = vim.o
 local fs = utils.fs
 local map = utils.map
 
----Error for this program
-M.error = nil
-
 local Config = require("lf.config")
-local a = require("plenary.async")
-local autil = require("plenary.async.util")
-local Job = require("plenary.job")
 -- local promise = require("promise")
+-- local async = require("async")
 
 ---@class Terminal
 local Terminal = require("toggleterm.terminal").Terminal
@@ -41,10 +26,10 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@field term Terminal toggleterm terminal
 ---@field view_idx number Current index of configuration `views`
 ---@field winid? number `Terminal` window id
----@field curr_file? string File path of the currently opened file
----@field id_tf? string Path to a file containing `lf`'s id
----@field selection_tf string Path to a file containing `lf`'s selection(s)
----@field lastdir_tf string Path to a file containing the last directory `lf` was in
+---@field curfile? string File path of the currently opened file
+---@field tmp_id? string Path to a file containing `lf`'s id
+---@field tmp_sel string Path to a file containing `lf`'s selection(s)
+---@field tmp_lastdir string Path to a file containing the last directory `lf` was in
 ---@field id number? Current `lf` session id
 ---@field bufnr number The open file's buffer number
 ---@field action string The current action to open the file
@@ -54,25 +39,23 @@ local Lf = {}
 ---@private
 ---Setup `toggleterm`'s `Terminal`
 local function setup_term()
-    terminal.setup(
-        {
-            size = function(term)
-                if term.direction == "horizontal" then
-                    return o.lines * 0.4
-                elseif term.direction == "vertical" then
-                    return o.columns * 0.5
-                end
-            end,
-            hide_numbers = true,
-            shade_filetypes = {},
-            shade_terminals = false,
-            start_in_insert = true,
-            insert_mappings = false,
-            terminal_mappings = true,
-            persist_mode = false,
-            persist_size = false
-        }
-    )
+    terminal.setup({
+        size = function(term)
+            if term.direction == "horizontal" then
+                return o.lines * 0.4
+            elseif term.direction == "vertical" then
+                return o.columns * 0.5
+            end
+        end,
+        hide_numbers = true,
+        shade_filetypes = {},
+        shade_terminals = false,
+        start_in_insert = true,
+        insert_mappings = false,
+        terminal_mappings = true,
+        persist_mode = false,
+        persist_size = false,
+    })
 end
 
 ---Setup a new instance of `Lf`
@@ -85,21 +68,13 @@ function Lf:new(config)
     self.__index = self
 
     if config then
-        self.cfg = Config:set(config):get()
+        self.cfg = Config:override(config)
     else
         self.cfg = Config
     end
 
-    self.id = nil
     self.bufnr = 0
-    self.winid = nil
     self.view_idx = 1
-
-    self.curr_file = nil
-    self.id_tf = nil
-    self.selection_tf = nil
-    self.lastdir_tf = nil
-
     self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
     self.signcolumn = o.signcolumn
@@ -113,45 +88,38 @@ end
 ---@private
 ---Create the `Terminal` and set it o `Lf.term`
 function Lf:__create_term()
-    self.term = Terminal:new(
-        {
-            cmd = self.cfg.default_cmd,
-            dir = self.cfg.dir,
-            direction = self.cfg.direction,
+    self.term = Terminal:new({
+        cmd = self.cfg.default_cmd,
+        dir = self.cfg.dir,
+        direction = self.cfg.direction,
+        winblend = self.cfg.winblend,
+        close_on_exit = true,
+        hidden = false,
+        highlights = self.cfg.highlights,
+        float_opts = {
+            border = self.cfg.border,
+            width = math.floor(o.columns * self.cfg.width),
+            height = math.floor(o.lines * self.cfg.height),
             winblend = self.cfg.winblend,
-            close_on_exit = true,
-            hidden = false,
-            highlights = self.cfg.highlights,
-            float_opts = {
-                border = self.cfg.border,
-                width = math.floor(o.columns * self.cfg.width),
-                height = math.floor(o.lines * self.cfg.height),
-                winblend = self.cfg.winblend
-            }
-        }
-    )
+        },
+    })
 end
 
 ---Start the underlying terminal
 ---@param path? string path where Lf starts (reads from Config if none, else CWD)
 function Lf:start(path)
     self:__open_in(path or self.cfg.dir)
-    if M.error ~= nil then
-        utils.err(M.error)
-        return
-    end
     self:__set_cmd_wrapper()
 
     self.term.on_open = function(term)
-        a.run(
-            function()
-                self:__on_open(term)
-            end
-        )
+        self:__on_open(term)
     end
 
     self.term.on_exit = function(term, _, _, _)
         self:__callback(term)
+        uv.fs_unlink(self.tmp_id)
+        uv.fs_unlink(self.tmp_lastdir)
+        uv.fs_unlink(self.tmp_sel)
     end
 
     self.term:open()
@@ -163,29 +131,26 @@ end
 ---@param path? string
 ---@return Lf?
 function Lf:__open_in(path)
-    local built = Path:new(
-        (function(dir)
-            if dir == "gwd" or dir == "git_dir" then
-                dir = utils.git_dir()
-            end
+    if path == "gwd" or path == "git_dir" then
+        path = utils.git_dir()
+    end
+    path = fn.expand(utils.tern(path == "" or path == nil, "%:p:h", path))
 
-            -- Base the CWD on the filename and not `lcd` and such
-            return fn.expand(utils.tern(dir == "" or dir == nil, "%:p:h", dir))
-        end)(path)
-    )
-
-    if not built:exists() then
-        utils.warn("Current directory doesn't exist")
-        return
+    local built = path
+    local stat = uv.fs_stat(path)
+    if not type(stat) == "table" then
+        local cwd = uv.cwd()
+        stat = uv.fs_stat(cwd)
+        built = cwd
     end
 
     -- Should be fine, but just checking
-    if not built:is_dir() then
-        built = built:parent()
+    if stat and not stat.type == "directory" then
+        built = fs.dirname(built)
     end
 
-    self.term.dir = built:absolute()
-    self.curr_file = fn.expand("%:p")
+    self.term.dir = built
+    self.curfile = fn.expand("%:p")
 
     return self
 end
@@ -195,14 +160,14 @@ end
 ---
 ---@return Lf
 function Lf:__set_cmd_wrapper()
-    self.selection_tf = os.tmpname()
-    self.lastdir_tf = os.tmpname()
-    self.id_tf = os.tmpname()
+    self.tmp_sel = os.tmpname()
+    self.tmp_lastdir = os.tmpname()
+    self.tmp_id = os.tmpname()
 
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
     self.term.cmd =
         ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]]):format(
-            self.term.cmd, self.id_tf, self.lastdir_tf, self.selection_tf,
+            self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel,
             self.term.dir
         )
     return self
@@ -218,126 +183,87 @@ function Lf:__on_open(term)
 
     -- TODO: The delay here needs to be fixed.
     --       I need to find a way to block this outer function's caller
-    vim.defer_fn(
-        function()
-            if self.cfg.focus_on_open then
-                if self.curr_file == nil then
-                    utils.warn(
-                        "Function has not been deferred long enough, preventing `focus_on_open` from working.\n"
-                            .. "Please report an issue on Github (lmburns/lf.nvim)"
-                    )
+    vim.defer_fn(function()
+        if self.cfg.focus_on_open then
+            if term.dir == fs.dirname(self.curfile) then
+                if not fn.filereadable(self.tmp_id) then
+                    utils.err(("Lf's id file is not readable: %s"):format(self.tmp_id))
                     return
                 end
 
-                if term.dir == fs.dirname(self.curr_file) then
-                    if not fn.filereadable(self.id_tf) then
-                        utils.err(
-                            ("Lf's id file is not readable: %s"):format(
-                                self.id_tf
-                            )
-                        )
-                        return
-                    end
+                local res = utils.read_file(self.tmp_id)
+                self.id = tonumber(res)
 
-                    local res = utils.read_file(self.id_tf)
-                    self.id = tonumber(res)
-
-                    if self.id == nil then
-                        utils.warn(
-                            "Lf's ID was not set\n"
-                                .. "Please report an issue on Github (lmburns/lf.nvim)"
-                        )
-                        return
-                    end
-                    Job:new(
-                        {
-                            command = "lf",
-                            args = {
-                                "-remote",
-                                ("send %s select %s"):format(
-                                    self.id, fs.basename(self.curr_file)
-                                )
-                            },
-                            interactive = false,
-                            detached = true,
-                            enabled_recording = false
-                        }
-                    ):sync()
+                if self.id ~= nil then
+                    fn.system({
+                        "lf",
+                        "-remote",
+                        ("send %s select %s"):format(self.id, fs.basename(self.curfile)),
+                    })
                 end
             end
-        end, 75
-    )
+        end
+    end, 70)
 
-    cmd("silent doautocmd User LfTermEnter")
+    cmd("silent! doautocmd User LfTermEnter")
 
     -- Wrap needs to be set, otherwise the window isn't aligned on resize
-    api.nvim_buf_call(
-        self.bufnr, function()
-            vim.wo[self.winid].showbreak = "NONE"
-            vim.wo[self.winid].wrap = true
-        end
-    )
+    api.nvim_buf_call(self.bufnr, function()
+        vim.wo[self.winid].showbreak = "NONE"
+        vim.wo[self.winid].wrap = true
+        vim.wo[self.winid].sidescrolloff = 0
+    end)
 
     if self.cfg.tmux then
         utils.tmux(true)
     end
 
     -- Not sure if this works
-    autil.scheduler(
-        function()
-            if self.cfg.mappings then
-                if self.cfg.escape_quit then
-                    map(
-                        "t", "<Esc>", "<Cmd>q<CR>",
-                        {
-                            buffer = self.bufnr,
-                            desc = "Exit Lf"
-                        }
-                    )
-                end
-
-                for key, mapping in pairs(self.cfg.default_actions) do
-                    map(
-                        "t", key, function()
-                            -- Change default_action for easier reading in the callback
-                            self.action = mapping
-
-                            -- Manually tell `lf` to open the current file
-                            -- since Neovim has hijacked the binding
-                            Job:new(
-                                {
-                                    command = "lf",
-                                    args = {
-                                        "-remote",
-                                        ("send %d open"):format(self.id)
-                                    }
-                                }
-                            ):sync()
-                        end, {
-                            noremap = true,
-                            buffer = self.bufnr,
-                            desc = ("Lf %s"):format(mapping)
-                        }
-                    )
-                end
-
-                if self.cfg.layout_mapping then
-                    map(
-                        "t", self.cfg.layout_mapping, function()
-                            api.nvim_win_set_config(
-                                self.winid, utils.get_view(
-                                    self.cfg.views[self.view_idx], self.bufnr,
-                                    self.signcolumn
-                                )
-                            )
-                            self.view_idx = self.view_idx < #self.cfg.views
-                                                and self.view_idx + 1 or 1
-                        end
-                    )
-                end
-            end
+    if self.cfg.mappings then
+        if self.cfg.escape_quit then
+            map(
+                "t",
+                "<Esc>",
+                "<Cmd>q<CR>",
+                {buffer = self.bufnr, desc = "Exit Lf"}
+            )
         end
-    )
+
+        for key, mapping in pairs(self.cfg.default_actions) do
+            map(
+                "t",
+                key,
+                function()
+                    -- Change default_action for easier reading in the callback
+                    self.action = mapping
+
+                    -- Manually tell `lf` to open the current file
+                    -- since Neovim has hijacked the binding
+                    fn.system({"lf", "-remote", ("send %d open"):format(self.id)})
+                end,
+                {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)}
+            )
+        end
+
+        if self.cfg.layout_mapping then
+            map(
+                "t",
+                self.cfg.layout_mapping,
+                function()
+                    api.nvim_win_set_config(
+                        self.winid,
+                        utils.get_view(
+                            self.cfg.views[self.view_idx],
+                            self.bufnr,
+                            self.signcolumn
+                        ))
+                    self.view_idx = self.view_idx < #self.cfg.views
+                        and self.view_idx + 1
+                        or 1
+                end
+            )
+        end
+    end
 end
 
 ---@private
@@ -349,38 +275,36 @@ function Lf:__callback(term)
         utils.tmux(false)
     end
 
-    if (self.action == "cd" or self.action == "lcd")
-        and uv.fs_stat(self.lastdir_tf) then
-        local last_dir = utils.read_file(self.lastdir_tf)
-
+    if
+        (self.action == "cd" or self.action == "lcd")
+        and uv.fs_stat(self.tmp_lastdir)
+    then
+        local last_dir = utils.read_file(self.tmp_lastdir)
         if last_dir ~= nil and last_dir ~= uv.cwd() then
             cmd(("%s %s"):format(self.action, last_dir))
             return
         end
-    elseif uv.fs_stat(self.selection_tf) then
+    elseif uv.fs_stat(self.tmp_sel) then
         local contents = {}
-
-        for line in io.lines(self.selection_tf) do
+        for line in io.lines(self.tmp_sel) do
             table.insert(contents, line)
         end
 
         if not vim.tbl_isempty(contents) then
             term:close()
-
             for _, fname in pairs(contents) do
-                cmd(("%s %s"):format(self.action, Path:new(fname):absolute()))
+                local stat = uv.fs_stat(fname)
+                if type(stat) == "table" then
+                    cmd(("%s %s"):format(self.action, fname))
+                end
             end
         end
     end
 
     -- Reset the action
-    vim.defer_fn(
-        function()
-            self.action = self.cfg.default_action
-        end, 1
-    )
+    vim.defer_fn(function()
+        self.action = self.cfg.default_action
+    end, 1)
 end
 
-M.Lf = Lf
-
-return M
+return Lf

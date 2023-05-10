@@ -8,26 +8,22 @@ It is very similar to [`lf.vim`](https://github.com/ptzz/lf.vim), except for tha
 ### Installation
 ```lua
 -- Sample configuration is supplied
-use(
-    {
-        "lmburns/lf.nvim",
-        config = function()
-          -- This feature will not work if the plugin is lazy-loaded
-          vim.g.lf_netrw = 1
+use({
+    "lmburns/lf.nvim",
+    config = function()
+        -- This feature will not work if the plugin is lazy-loaded
+        vim.g.lf_netrw = 1
 
-          require("lf").setup(
-              {
-                  escape_quit = false,
-                  border = "rounded",
-                  highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
-              }
-          )
+        require("lf").setup({
+                escape_quit = false,
+                border = "rounded",
+                -- highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
+        })
 
-          vim.keymap.set("n", "<C-o>", ":Lf<CR>")
-        end,
-        requires = {"plenary.nvim", "toggleterm.nvim"}
-    }
-)
+        vim.keymap.set("n", "<C-o>", ":Lf<CR>")
+    end,
+    requires = {"plenary.nvim", "toggleterm.nvim"}
+})
 ```
 
 ### Setup/Configuration
@@ -45,7 +41,7 @@ require("lf").setup({
   },
 
   winblend = 10, -- psuedotransparency level
-  dir = "", -- directory where `lf` starts ('gwd' is git-working-directory, "" is CWD)
+  dir = "", -- directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
   direction = "float", -- window type: float horizontal vertical
   border = "double", -- border kind: single double shadow curved
   height = 0.80, -- height of the *floating* window
@@ -77,7 +73,7 @@ require("lf").setup({
   }
 })
 
-vim.api.nvim_set_keymap("n", "<mapping>", "<cmd>lua require('lf').start()<CR>", { noremap = true })
+vim.keymap.set("n", "<mapping>", "<cmd>lua require('lf').start()<CR>", {noremap = true})
 ```
 
 Another option is to use `vim.keymap.set`, which requires `nvim` 0.7.0 or higher. This doesn't require local
@@ -101,7 +97,7 @@ vim.keymap.set(
         mappings = true, -- whether terminal buffer mapping is enabled
     })
   end,
-  { noremap = true }
+  {noremap = true}
 )
 ```
 
@@ -114,8 +110,8 @@ options (`table`). If there is only one argument and it is a `table`, this will 
 options and `lf` will open in the current directory. The following are all valid:
 
 ```lua
-require('lf').start({ border = "rounded" }) -- opens in CWD with rounded borders
-require('lf').start(nil, { border = "rounded" }) -- opens in CWD with rounded borders
+require('lf').start({border = "rounded"}) -- opens in CWD with rounded borders
+require('lf').start(nil, {border = "rounded"}) -- opens in CWD with rounded borders
 
 require('lf').start("~/.config") -- opens in `~/.config` with either `.setup()` or default options
 require('lf').start("~/.config", nil) -- opens in `~/.config` with either `.setup()` or default options
@@ -123,14 +119,14 @@ require('lf').start("~/.config", nil) -- opens in `~/.config` with either `.setu
 require('lf').start(nil, nil) -- opens in CWD with either `.setup()` or default options
 require('lf').start() -- opens in CWD with either `.setup()` or default options
 
-require('lf').start("~/.config", { border = "rounded" }) -- opens in `~/.config` with rounded borders
+require('lf').start("~/.config", {border = "rounded"}) -- opens in `~/.config` with rounded borders
 ```
 
 ### Highlight Groups
 The highlight groups that I know for sure work are the ones mentioned above (`Normal`, `NormalFloat`, `FloatBorder`). These are passed to `toggleterm`, and there is a plan in the future to make these `Lf`'s own groups. For now, a one-shot way to change the color of the border of the terminal is the following:
 
 ```vim
-:lua require("lf").start({ highlights = { FloatBorder = { guifg = "#819C3B" } } })
+:lua require("lf").start({highlights = {FloatBorder = {guifg = "#819C3B"}}})
 ```
 
 ### Default Actions
@@ -147,7 +143,7 @@ If you do not have the nightly version of `nvim`, then the `mappings` field can 
 Otherwise, a notification will be displayed saying that you are not allowed to use them.
 
 ```lua
-require("lf").start({ mappings = false })
+require("lf").start({mappings = false})
 ```
 
 ### Replacing Netrw
