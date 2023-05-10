@@ -262,7 +262,7 @@ end
 ---A callback for the `Terminal`
 ---
 ---@param term Terminal
-function Lf:__callback(_term)
+function Lf:__callback(term)
     if self.cfg.tmux then
         utils.tmux(false)
     end
@@ -277,18 +277,11 @@ function Lf:__callback(_term)
             return
         end
     elseif uv.fs_stat(self.tmp_sel) then
-        local contents = {}
-        for line in io.lines(self.tmp_sel) do
-            table.insert(contents, line)
-        end
-
-        if #contents > 0 then
-            -- term:close()
-            for _, fname in pairs(contents) do
-                local stat = uv.fs_stat(fname)
-                if type(stat) == "table" then
-                    cmd(("%s %s"):format(self.action, fn.fnameescape(fname)))
-                end
+        term:close()
+        for fname in io.lines(self.tmp_sel) do
+            local stat = uv.fs_stat(fname)
+            if type(stat) == "table" then
+                cmd(("%s %s"):format(self.action, fn.fnameescape(fname)))
             end
         end
     end
