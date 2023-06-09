@@ -113,40 +113,6 @@ function M.tern(cond, is_if, is_else, simple)
     end
 end
 
----## if else nil
----Similar to `vim.F.nil` except that:
----   - a default value can be given
----   - `if cond == nil then want else default`
----@generic T, V
----@param cond any Value to check if `nil`
----@param is_nil T Value to return if `cond` is `nil`
----@param is_not_nil V Value to return if `cond` is not `nil`
----@return T | V
-function M.ife_nil(cond, is_nil, is_not_nil)
-    return M.tern(cond == nil, is_nil, is_not_nil)
-end
-
----## if nil then
----Return a default value if `val` is nil
----   - `if val == nil then default else val`
----   - `ifn_then`
----@generic T, V
----@param val T value to check if `nil`
----@param default V default value to return if `val` is `nil`
----@return T | V
-function M.unwrap_or(val, default)
-    if type(val) ~= "table" then
-        return M.ife_nil(val, default, val)
-    end
-    val = vim.deepcopy(val or {})
-    for k, v in pairs(default) do
-        if val[k] == nil then
-            val[k] = v
-        end
-    end
-    return val
-end
-
 ---@param path string
 ---@return uv_fs_t|string
 ---@return uv.aliases.fs_stat_table?
@@ -192,11 +158,8 @@ function M.width(bufnr, signcolumn)
     local width = #tostring(api.nvim_buf_line_count(bufnr))
     local col = vim.split(signcolumn, ":")
     if #col == 2 then
-        -- Can't cast integer to number?
-        ---@diagnostic disable-next-line:cast-local-type
         width = width + tonumber(col[2])
     end
-    ---@diagnostic disable-next-line:return-type-mismatch
     return signcolumn:match("no") and o.columns or o.columns - width
 end
 
@@ -207,29 +170,27 @@ end
 ---@return table
 function M.get_view(opts, bufnr, signcolumn)
     opts = opts or {}
-    local width = opts.width or math.ceil(
-        math.min(
-            M.width(bufnr, signcolumn),
-            math.max(80, M.width(bufnr, signcolumn) - 20)
-        )
-    )
-    local height = opts.height
-        or math.ceil(
-            math.min(M.height(), math.max(20, M.height() - 10))
-        )
 
-    width = fn.float2nr(width * M.width(bufnr, signcolumn))
-    height = fn.float2nr(M.round(height * M.height()))
-    local col = fn.float2nr(M.round((M.width(bufnr, signcolumn) - width) / 2))
-    local row = fn.float2nr(M.round((M.height() - height) / 2))
+    local width = opts.width
+        and fn.float2nr(fn.round(opts.width * o.columns))
+        or M.width(bufnr, signcolumn)
+    local height = opts.height
+        and fn.float2nr(fn.round(opts.height * o.lines))
+        or M.height()
+    local col = opts.col
+        and fn.float2nr(fn.round(opts.col * o.columns))
+        or math.ceil(o.columns - width) * 0.5 - 1
+    local row = opts.row
+        and fn.float2nr(fn.round(opts.row * o.lines))
+        or math.ceil(o.lines - height) * 0.5 - 1
 
     return {
         col = col,
         row = row,
-        relative = "editor",
-        style = "minimal",
         width = width,
         height = height,
+        relative = "editor",
+        style = "minimal",
     }
 end
 
@@ -237,13 +198,7 @@ end
 ---@return string|nil
 function M.git_dir()
     ---@diagnostic disable-next-line: missing-parameter
-    local gitdir = fn.system(
-        ("git -C %s rev-parse --show-toplevel"):format(
-            fn.expand(
-                "%:p:h"
-            )
-        )
-    )
+    local gitdir = fn.system(("git -C %s rev-parse --show-toplevel"):format(fn.expand("%:p:h")))
 
     if gitdir:match("^fatal:.*") then
         M.info("Failed to get git directory")
@@ -260,14 +215,10 @@ function M.tmux(disable)
     end
     if disable then
         fn.system([[tmux set status off]])
-        fn.system(
-            [[tmux list-panes -F '\#F' | grep -q Z || tmux resize-pane -Z]]
-        )
+        fn.system([[tmux list-panes -F '\#F' | grep -q Z || tmux resize-pane -Z]])
     else
         fn.system([[tmux set status on]])
-        fn.system(
-            [[tmux list-panes -F '\#F' | grep -q Z && tmux resize-pane -Z]]
-        )
+        fn.system([[tmux list-panes -F '\#F' | grep -q Z && tmux resize-pane -Z]])
     end
 end
 

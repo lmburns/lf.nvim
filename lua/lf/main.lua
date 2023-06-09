@@ -97,8 +97,10 @@ function Lf:__create_term()
         highlights = self.cfg.highlights,
         float_opts = {
             border = self.cfg.border,
-            width = math.floor(o.columns * self.cfg.width),
-            height = math.floor(o.lines * self.cfg.height),
+            width = self.cfg.width,
+            height = self.cfg.height,
+            row = self.cfg.row,
+            col = self.cfg.col,
             winblend = self.cfg.winblend,
         },
     })
@@ -163,11 +165,15 @@ function Lf:__set_cmd_wrapper()
     self.tmp_lastdir = os.tmpname()
     self.tmp_id = os.tmpname()
 
+    local open_on = self.term.dir
+    if self.cfg.focus_on_open and fs.dirname(self.curfile) == self.term.dir then
+        open_on = self.curfile
+    end
+
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
     self.term.cmd =
         ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]]):format(
-            self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel,
-            self.term.dir
+            self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel, open_on
         )
     return self
 end
@@ -178,30 +184,6 @@ end
 function Lf:__on_open(term)
     self.bufnr = term.bufnr
     self.winid = term.window
-
-    -- TODO: The delay here needs to be fixed.
-    --       I need to find a way to block this outer function's caller
-    vim.defer_fn(function()
-        if self.cfg.focus_on_open then
-            if self.term.dir == fs.dirname(self.curfile) then
-                if not fn.filereadable(self.tmp_id) then
-                    utils.err(("Lf's id file is not readable: %s"):format(self.tmp_id))
-                    return
-                end
-
-                local res = utils.read_file(self.tmp_id)
-                self.id = tonumber(res)
-
-                if self.id ~= nil then
-                    fn.system({
-                        "lf",
-                        "-remote",
-                        ("send %s select %s"):format(self.id, fs.basename(self.curfile)),
-                    })
-                end
-            end
-        end
-    end, 70)
 
     cmd("silent! doautocmd User LfTermEnter")
 

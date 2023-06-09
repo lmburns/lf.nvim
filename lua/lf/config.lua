@@ -1,43 +1,6 @@
 local fn = vim.fn
 local o = vim.o
 
----@alias LfGenericBorder {[1]:string,[2]:string,[3]:string,[4]:string,[5]:string,[6]:string,[7]:string,[8]:string}
----@alias LfBorder "'none'"|"'single'"|"'double'"|"'rounded'"|"'solid'"|"'shadow'"|LfGenericBorder
-
----@class LfViews
----@field relative "'editor'"|"'win'"|"'cursor'"|"'mouse'"
----@field win number For `relative='win'`
----@field anchor "'NW'"|"'NE'"|"'SW'"|"'SE'" Which corner of float to place `(row, col)`
----@field width number
----@field height number
----@field bufpos {row: number, col: number}
----@field row number|float
----@field col number|float
----@field focusable boolean
----@field zindex number
----@field style "'minimal'"
----@field border LfBorder Border kind
----@field title string|{[1]: string, [2]: string}[] Can be a string or an array of tuples
----@field title_pos "'left'"|"'center'"|"'right'"
----@field noautocmd boolean
-
----@class LfConfig
----@field default_cmd string Default `lf` command
----@field default_action string Default action when `Lf` opens a file
----@field default_actions { [string]: string } Default action keybindings
----@field winblend number Psuedotransparency level
----@field dir "'gwd'"|"''"|nil|string Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
----@field direction "'vertical'"|"'horizontal'"|"'tab'"|"'float'" Window type
----@field border LfBorder Border kind
----@field height number Height of the *floating* window
----@field width number Width of the *floating* window
----@field escape_quit boolean Whether escape should be mapped to quit
----@field focus_on_open boolean Whether Lf should open focused on current file
----@field mappings boolean Whether terminal buffer mappings should be set
----@field tmux boolean Whether `tmux` statusline should be changed by this plugin
----@field highlights table<string, table<string, string>> Highlight table passed to `toggleterm`
----@field layout_mapping string Keybinding to rotate through the window layouts
----@field views LfViews[] Table of layouts to be applied to `nvim_win_set_config`
 local Config = {}
 
 ---@type LfConfig
@@ -54,8 +17,10 @@ local opts = {
     dir = "",
     direction = "float",
     border = "double",
-    height = 0.80,
-    width = 0.85,
+    -- col = fn.float2nr(fn.round(0.12 * o.columns)),
+    -- row = fn.float2nr(fn.round(0.12 * o.lines)),
+    width = fn.float2nr(fn.round(0.75 * o.columns)),
+    height = fn.float2nr(fn.round(0.75 * o.lines)),
     escape_quit = false,
     focus_on_open = true,
     mappings = true,
@@ -67,13 +32,13 @@ local opts = {
     -- Layout configurations
     layout_mapping = "<A-u>",
     views = {
-        {width = 0.600, height = 0.600},
-        {
-            width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
-            height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines,
-        },
         {width = 0.800, height = 0.800},
+        {width = 0.600, height = 0.600},
         {width = 0.950, height = 0.950},
+        {width = 0.500, height = 0.500, col = 0, row = 0},
+        {width = 0.500, height = 0.500, col = 0, row = 0.5},
+        {width = 0.500, height = 0.500, col = 0.5, row = 0},
+        {width = 0.500, height = 0.500, col = 0.5, row = 0.5},
     },
 }
 
@@ -124,7 +89,7 @@ init()
 ---@return LfConfig
 function Config:override(cfg)
     if type(cfg) == "table" then
-        self = vim.tbl_deep_extend("keep", cfg or {}, self) --[[@as LfConfig]]
+        self = vim.tbl_deep_extend("force", self, cfg) --[[@as LfConfig]]
         self = validate(self)
     end
     return self
@@ -137,3 +102,41 @@ return setmetatable(Config, {
     __newindex = function(_self, _key, _val)
     end,
 })
+
+---@alias LfGenericBorder {[1]:string,[2]:string,[3]:string,[4]:string,[5]:string,[6]:string,[7]:string,[8]:string}
+---@alias LfBorder "'none'"|"'single'"|"'double'"|"'rounded'"|"'solid'"|"'shadow'"|LfGenericBorder
+
+---@class LfViews
+---@field relative "'editor'"|"'win'"|"'cursor'"|"'mouse'"
+---@field win number For `relative='win'`
+---@field anchor "'NW'"|"'NE'"|"'SW'"|"'SE'" Which corner of float to place `(row, col)`
+---@field width number
+---@field height number
+---@field bufpos {row: number, col: number}
+---@field row number|float
+---@field col number|float
+---@field focusable boolean
+---@field zindex number
+---@field style "'minimal'"
+---@field border LfBorder Border kind
+---@field title string|{[1]: string, [2]: string}[] Can be a string or an array of tuples
+---@field title_pos "'left'"|"'center'"|"'right'"
+---@field noautocmd boolean
+
+---@class LfConfig
+---@field default_cmd string Default `lf` command
+---@field default_action string Default action when `Lf` opens a file
+---@field default_actions { [string]: string } Default action keybindings
+---@field winblend number Psuedotransparency level
+---@field dir "'gwd'"|"''"|nil|string Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
+---@field direction "'vertical'"|"'horizontal'"|"'tab'"|"'float'" Window type
+---@field border LfBorder Border kind
+---@field height number Height of the *floating* window
+---@field width number Width of the *floating* window
+---@field escape_quit boolean Whether escape should be mapped to quit
+---@field focus_on_open boolean Whether Lf should open focused on current file
+---@field mappings boolean Whether terminal buffer mappings should be set
+---@field tmux boolean Whether `tmux` statusline should be changed by this plugin
+---@field highlights table<string, table<string, string>> Highlight table passed to `toggleterm`
+---@field layout_mapping string Keybinding to rotate through the window layouts
+---@field views LfViews[] Table of layouts to be applied to `nvim_win_set_config`
