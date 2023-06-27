@@ -94,6 +94,8 @@ function Lf:__create_term()
         winblend = self.cfg.winblend,
         close_on_exit = true,
         hidden = false,
+        persist_size = false,
+        persist_mode = true,
         highlights = self.cfg.highlights,
         float_opts = {
             border = self.cfg.border,
@@ -135,7 +137,7 @@ function Lf:__open_in(path)
     if path == "gwd" or path == "git_dir" then
         path = utils.git_dir()
     end
-    path = fn.expand(utils.tern(path == "" or path == nil, "%:p:h", path))
+    path = fn.expand((path == "" or path == nil) and "%:p:h" or path)
 
     local built = path
     local stat = uv.fs_stat(path)
@@ -166,15 +168,17 @@ function Lf:__set_cmd_wrapper()
     self.tmp_id = os.tmpname()
 
     local open_on = self.term.dir
-    if self.cfg.focus_on_open and fs.dirname(self.curfile) == self.term.dir then
+    if
+        self.cfg.focus_on_open
+        and fs.dirname(self.curfile) == self.term.dir
+    then
         open_on = self.curfile
     end
 
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
     self.term.cmd =
-        ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]]):format(
-            self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel, open_on
-        )
+        ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]])
+        :format(self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel, open_on)
     return self
 end
 

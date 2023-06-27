@@ -59,60 +59,6 @@ function M.err(msg, print, opts)
     end
 end
 
----Create a shallow copy of a portion of a vector.
----Can index with negative numbers.
----@generic T
----@param vec T[] Vector to select from
----@param first? integer First index, inclusive
----@param last? integer Last index, inclusive
----@return T[] #sliced vector
-function M.list_slice(vec, first, last)
-    local slice = {}
-    if first and first < 0 then
-        first = #vec + first + 1
-    end
-    if last and last < 0 then
-        last = #vec + last + 1
-    end
-    for i = first or 1, last or #vec do
-        table.insert(slice, vec[i])
-    end
-
-    return slice
-end
-
----Return all elements in `t` between `first` and `last` index.
----Can index with negative numbers.
----@generic T
----@param vec T[] Vector to select from
----@param first? integer First index, inclusive
----@param last? integer Last index, inclusive
----@return T ...
-function M.list_select(vec, first, last)
-    return unpack(M.list_slice(vec, first, last))
-end
-
----Similar to C's ternary operator
----@generic T, V
----@param cond? boolean|fun():boolean Statement to be tested
----@param is_if T Return if cond is truthy
----@param is_else V Return if cond is not truthy
----@param simple? boolean Never treat `is_if` and `is_else` as arg lists
----@return unknown
-function M.tern(cond, is_if, is_else, simple)
-    if cond then
-        if not simple and type(is_if) == "table" and vim.is_callable(is_if[1]) then
-            return is_if[1](M.list_select(is_if, 2))
-        end
-        return is_if
-    else
-        if not simple and type(is_else) == "table" and vim.is_callable(is_else[1]) then
-            return is_else[1](M.list_select(is_else, 2))
-        end
-        return is_else
-    end
-end
-
 ---@param path string
 ---@return uv_fs_t|string
 ---@return uv.aliases.fs_stat_table?
@@ -136,13 +82,6 @@ function M.map(mode, lhs, rhs, opts)
     vim.keymap.set(mode, lhs, rhs, opts)
 end
 
----Simple rounding function
----@param num number number to round
----@return number
-function M.round(num)
-    return math.floor(num + 0.5)
-end
-
 ---Get Neovim window height
 ---@return number
 function M.height()
@@ -154,13 +93,18 @@ end
 ---@param signcolumn string: Signcolumn option set by the user, not the terminal buffer
 ---@return number
 function M.width(bufnr, signcolumn)
+    if signcolumn:match("no") then
+        return o.columns
+    end
+
     -- This is a rough estimate of the signcolumn
     local width = #tostring(api.nvim_buf_line_count(bufnr))
     local col = vim.split(signcolumn, ":")
     if #col == 2 then
         width = width + tonumber(col[2])
     end
-    return signcolumn:match("no") and o.columns or o.columns - width
+
+    return o.columns - width
 end
 
 ---Get the table that is passed to `api.nvim_win_set_config`
@@ -172,11 +116,41 @@ function M.get_view(opts, bufnr, signcolumn)
     opts = opts or {}
 
     local width = opts.width
-        and fn.float2nr(fn.round(opts.width * o.columns))
-        or M.width(bufnr, signcolumn)
+    if width > o.columns then
+        M.err(("width (%d) cannot be greater than columns (%d)"):format(width, o.columns))
+        width = nil
+    end
+    width = width or M.width(bufnr, signcolumn)
+    if width < 0 then
+        if width > -1 then
+            width = fn.float2nr(o.columns + fn.round(width * o.columns))
+        else
+            width = o.columns + width
+        end
+    else
+        if width < 1 then
+            width = fn.float2nr(fn.round(width * o.columns))
+        end
+    end
+
     local height = opts.height
-        and fn.float2nr(fn.round(opts.height * o.lines))
-        or M.height()
+    if height > o.lines then
+        M.err(("height (%d) cannot be greater than lines (%d)"):format(height, o.lines))
+        height = nil
+    end
+    height = height or M.height()
+    if height < 0 then
+        if height > -1 then
+            height = fn.float2nr(o.lines + fn.round(height * o.lines))
+        else
+            height = o.lines + height
+        end
+    else
+        if height < 1 then
+            height = fn.float2nr(fn.round(height * o.lines))
+        end
+    end
+
     local col = opts.col
         and fn.float2nr(fn.round(opts.col * o.columns))
         or math.ceil(o.columns - width) * 0.5 - 1
@@ -185,16 +159,15 @@ function M.get_view(opts, bufnr, signcolumn)
         or math.ceil(o.lines - height) * 0.5 - 1
 
     return {
-        col = col,
-        row = row,
-        width = width,
-        height = height,
+        col = col,       -- fractional allowed
+        row = row,       -- fractional allowed
+        width = width,   -- minimum of 1
+        height = height, -- minimum of 1
         relative = "editor",
         style = "minimal",
     }
 end
 
----Helper function to derive the current git directory path
 ---@return string|nil
 function M.git_dir()
     ---@diagnostic disable-next-line: missing-parameter
