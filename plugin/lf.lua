@@ -1,17 +1,18 @@
-local M = {}
-
-if _G.loaded_lf == 1 then
+if vim.g.loaded_lf == 1 then
     return
 end
+
+vim.g.loaded_lf = 1
+
+local M = {}
 
 local uv = vim.loop
 local api = vim.api
 local fn = vim.fn
 local cmd = vim.cmd
 
-_G.loaded_lf = 1
-
 api.nvim_create_user_command("Lf", function(tbl)
+    ---@diagnostic disable-next-line: missing-parameter
     require("lf").start(tbl.args)
 end, {nargs = "*", complete = "file"})
 

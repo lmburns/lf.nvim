@@ -1,12 +1,14 @@
 *lf.txt*                                                            File Manager
+*lf.nvim*
 
 Version: 0.2
-Author : Lucas Burns <https://github.com/lmburns>
+Author : Lucas Burns <burnsac@me.com>
+Homepage: <https://github.com/lmburns/lf.nvim>
 License: BSD3
 
 ================================================================================
-
 TABLE OF CONTENTS                                       *lf-table-of-contents*
+
 Introduction                                            |lf-introduction|
 Requirements                                            |lf-requirements|
 Installation                                            |lf-installation|
@@ -14,65 +16,131 @@ Usage                                                   |lf-usage|
 Configuration                                           |lf-configuration|
 
 ================================================================================
-
 INTRODUCTION                                            *lf-introduction*
 
-*lf.nvim* is a plugin written in Lua that allows you to use the
-*lf* <https://github.com/gokechan/lf> file manager inside of Neovim.
+`lf.nvim` is a plugin written in Lua that allows you to use the
+`lf` <https://github.com/gokechan/lf> file manager inside of Neovim.
 
-There is a similar plugin *lf.vim* <https://github.com/ptzz/lf.vim> which
+There is a similar plugin `lf.vim` <https://github.com/ptzz/lf.vim> which
 basically does the same thing, except that is is written in Vimscript.
 
 Since this plugin uses the Neovim window API, Vim is not supported.
 
 ================================================================================
-
 REQUIREMENTS                                            *lf-requirements*
 
-1. *Lf* (https://github.com/gokechan/lf)
-2. *toggleterm.nvim* (https://github.com/akinsho/toggleterm.nvim)
-3. *plenary.nvim* (https://github.com/nvim-lua/plenary.nvim)
+1. `lf` (https://github.com/gokechan/lf)
+2. `toggleterm.nvim` (https://github.com/akinsho/toggleterm.nvim)
 
 ================================================================================
-
 INSTALLATION                                            *lf-installation*
 
 Requires lf to be installed. The installation instructions for lf can be
 found here <https://github.com/gokcehan/lf#installation>.
 
-A sample installation is given.
-NOTE: Replacing |netrw| will not work correctly if the plugin is lazily loaded.
->
-  use(
-      {
-          "lmburns/lf.nvim",
-          config = function()
-            vim.g.lf_netrw = 1
+See: |lf-configuration|
 
-            require("lf").setup(
-                {
-                    escape_quit = false,
-                    border = "rounded",
-                    highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
-                }
-            )
+Example ~
+  NOTE: Replacing |netrw| will not work correctly if the plugin is lazily loaded.
+>lua
+  use({
+      "lmburns/lf.nvim",
+      config = function()
+          -- This feature will not work if the plugin is lazy-loaded
+          vim.g.lf_netrw = 1
 
-            vim.keymap.set("n", "<C-o>", ":Lf<CR>")
-          end,
-          requires = {"plenary.nvim", "toggleterm.nvim"}
-      }
-  )
+          require("lf").setup({
+              escape_quit = false,
+              border = "rounded",
+          })
+
+          vim.keymap.set("n", "<M-o>", "<Cmd>Lf<CR>")
+
+          vim.api.nvim_create_autocmd({
+              event = "User",
+              pattern = "LfTermEnter",
+              callback = function(a)
+                  vim.api.nvim_buf_set_keymap(a.buf, "t", "q", "q", {nowait = true})
+              end,
+          })
+      end,
+      requires = {"toggleterm.nvim"}
+  })
 <
 
 ================================================================================
-
 USAGE                                                   *lf-usage*
 
-The file manager can be opened with the |:Lf| command.
+The file manager can be opened with the |:Lf| command or the Lua function >lua
+  require("lf").start()
+<.
+
+Argument scheme ~
+
+- Opens in current directory with rounded borders >lua
+  require('lf').start({border = "rounded"})
+  -- equivalent
+  require('lf').start(nil, {border = "rounded"})
+<
+- Opens in `~/.config` with either `.setup()` or default options >lua
+  require('lf').start("~/.config")
+  -- equivalent
+  require('lf').start("~/.config", nil)
+  -- same but rounded borders
+  require('lf').start("~/.config", {border = "rounded"}
+<
+- Opens in current directory with either `.setup()` or default options >lua
+  require('lf').start(nil, nil)
+  -- equivalent
+  require('lf').start()
+<
 
 ================================================================================
-
 CONFIGURATION                                           *lf-configuration*
+
+Defaults ~
+>lua
+  require("lf").setup({
+    default_action = "drop", -- default action when `Lf` opens a file
+    default_actions = { -- default action keybindings
+      ["<C-t>"] = "tabedit",
+      ["<C-x>"] = "split",
+      ["<C-v>"] = "vsplit",
+      ["<C-o>"] = "tab drop",
+    },
+
+    winblend = 10, -- psuedotransparency level
+    dir = "", -- directory where `lf` starts (`'gwd'` is git-working-directory, ""/nil is CWD)
+    direction = "float", -- window type: float horizontal vertical
+    border = "rounded", -- border kind: single double shadow curved
+    height = fn.float2nr(fn.round(0.75 * o.lines)), -- height of the floating window
+    width = fn.float2nr(fn.round(0.75 * o.columns)), -- width of the floating window
+    escape_quit = true, -- map escape to the quit command (so it doesn't go into a meta normal mode)
+    focus_on_open = true, -- focus the current file when opening Lf (experimental)
+    mappings = true, -- whether terminal buffer mapping is enabled
+    tmux = false, -- tmux statusline can be disabled on opening of Lf
+    highlights = { -- highlights passed to toggleterm
+      Normal = {link = "Normal"},
+      NormalFloat = {link = 'Normal'},
+      FloatBorder = {guifg = "<VALUE>", guibg = "<VALUE>"},
+    },
+
+    -- Layout configurations
+    layout_mapping = "<M-u>", -- resize window with this key
+    views = { -- window dimensions to rotate through
+      {width = 0.800, height = 0.800},
+      {width = 0.600, height = 0.600},
+      {width = 0.950, height = 0.950},
+      {width = 0.500, height = 0.500, col = 0, row = 0},
+      {width = 0.500, height = 0.500, col = 0, row = 0.5},
+      {width = 0.500, height = 0.500, col = 0.5, row = 0},
+      {width = 0.500, height = 0.500, col = 0.5, row = 0.5},
+  })
+
+  -- Equivalent
+  vim.keymap.set("n", "<M-o>", "<Cmd>lua require('lf').start()<CR>", {noremap = true})
+  vim.keymap.set("n", "<M-o>", "<Cmd>Lf<CR>", {noremap = true})
+<
 
 ================================================================================
 vim:tw=80:sw=0:ts=2:sts=2:et:ft=help:norl:

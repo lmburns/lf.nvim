@@ -3,7 +3,7 @@ local o = vim.o
 
 local Config = {}
 
----@type LfConfig
+---@type Lf.Config
 local opts = {
     default_cmd = "lf",
     default_action = "drop",
@@ -17,8 +17,8 @@ local opts = {
     dir = "",
     direction = "float",
     border = "double",
-    width = fn.float2nr(fn.round(0.75 * o.columns)),
     height = fn.float2nr(fn.round(0.75 * o.lines)),
+    width = fn.float2nr(fn.round(0.75 * o.columns)),
     escape_quit = false,
     focus_on_open = true,
     mappings = true,
@@ -26,6 +26,11 @@ local opts = {
     highlights = {
         Normal = {link = "Normal"},
         FloatBorder = {link = "FloatBorder"},
+    },
+    count = nil,
+    env = {
+        clear = false,
+        vars = {}, -- NOTE: this doesn't work for now
     },
     -- Layout configurations
     layout_mapping = "<A-u>",
@@ -41,8 +46,8 @@ local opts = {
 }
 
 ---Validate configuration values
----@param cfg LfConfig existing configuration options
----@return LfConfig
+---@param cfg Lf.Config existing configuration options
+---@return Lf.Config
 local function validate(cfg)
     vim.validate({
         default_cmd = {cfg.default_cmd, "s", false},
@@ -75,7 +80,7 @@ end
 local function init()
     local lf = require("lf")
     -- Keep options from the `lf.setup()` call
-    Config = vim.tbl_deep_extend("keep", lf.__conf or {}, opts) --[[@as LfConfig]]
+    Config = vim.tbl_deep_extend("keep", lf.__conf or {}, opts) --[[@as Lf.Config]]
     Config = validate(Config)
     lf.__conf = nil
 end
@@ -83,11 +88,11 @@ end
 init()
 
 ---Set a configuration passed as a function argument (not through `setup`)
----@param cfg? LfConfig configuration options
----@return LfConfig
+---@param cfg? Lf.Config configuration options
+---@return Lf.Config
 function Config:override(cfg)
     if type(cfg) == "table" then
-        self = vim.tbl_deep_extend("force", self, cfg) --[[@as LfConfig]]
+        self = vim.tbl_deep_extend("force", self, cfg) --[[@as Lf.Config]]
         self = validate(self)
     end
     return self
@@ -101,40 +106,48 @@ return setmetatable(Config, {
     end,
 })
 
----@alias LfGenericBorder {[1]:string,[2]:string,[3]:string,[4]:string,[5]:string,[6]:string,[7]:string,[8]:string}
----@alias LfBorder "'none'"|"'single'"|"'double'"|"'rounded'"|"'solid'"|"'shadow'"|LfGenericBorder
+---@alias Lf.border.generic {[1]:string,[2]:string,[3]:string,[4]:string,[5]:string,[6]:string,[7]:string,[8]:string}
+---@alias Lf.border "'none'"|"'single'"|"'double'"|"'rounded'"|"'solid'"|"'shadow'"|Lf.border.generic
+---@alias Lf.direction "'vertical'"|"'horizontal'"|"'tab'"|"'float'"
+---@alias Lf.directory "'gwd'"|"''"|nil|string
 
----@class LfViews
+---@class Lf.views
 ---@field relative "'editor'"|"'win'"|"'cursor'"|"'mouse'"
----@field win number For `relative='win'`
+---@field win integer For `relative='win'`
 ---@field anchor "'NW'"|"'NE'"|"'SW'"|"'SE'" Which corner of float to place `(row, col)`
 ---@field width number
 ---@field height number
 ---@field bufpos {row: number, col: number}
----@field row number|float
----@field col number|float
+---@field row integer|float
+---@field col integer|float
 ---@field focusable boolean
 ---@field zindex number
 ---@field style "'minimal'"
----@field border LfBorder Border kind
+---@field border Lf.border Border kind
 ---@field title string|{[1]: string, [2]: string}[] Can be a string or an array of tuples
 ---@field title_pos "'left'"|"'center'"|"'right'"
 ---@field noautocmd boolean
 
----@class LfConfig
+---@class Lf.env
+---@field clear boolean Should environment variables be cleared?
+---@field vars table<string, string|number> Hash of variables to be set on startup
+
+---@class Lf.Config
 ---@field default_cmd string Default `lf` command
 ---@field default_action string Default action when `Lf` opens a file
----@field default_actions { [string]: string } Default action keybindings
+---@field default_actions table<string, string> Default action keybindings
 ---@field winblend number Psuedotransparency level
----@field dir "'gwd'"|"''"|nil|string Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
----@field direction "'vertical'"|"'horizontal'"|"'tab'"|"'float'" Window type
----@field border LfBorder Border kind
----@field height number Height of the *floating* window
----@field width number Width of the *floating* window
+---@field dir Lf.directory Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
+---@field direction Lf.direction Window layout
+---@field border Lf.border Border kind
+---@field width integer Width of the *floating* window
+---@field height integer Height of the *floating* window
 ---@field escape_quit boolean Whether escape should be mapped to quit
 ---@field focus_on_open boolean Whether Lf should open focused on current file
 ---@field mappings boolean Whether terminal buffer mappings should be set
 ---@field tmux boolean Whether `tmux` statusline should be changed by this plugin
+---@field env Lf.env Environment variables
 ---@field highlights table<string, table<string, string>> Highlight table passed to `toggleterm`
 ---@field layout_mapping string Keybinding to rotate through the window layouts
----@field views LfViews[] Table of layouts to be applied to `nvim_win_set_config`
+---@field views Lf.views[] Table of layouts to be applied to `nvim_win_set_config`
+---@field count? integer A number that triggers that specific terminal

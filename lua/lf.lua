@@ -4,7 +4,7 @@ local loaded = false
 local utils = require("lf.utils")
 
 ---Check Neovim version before setting mappings
----@param cfg LfConfig
+---@param cfg Lf.Config
 local function has_feature(cfg)
     if not vim.keymap or not vim.keymap.set then
         utils.err("lf.nvim mappings require Neovim 0.7.0 or higher", true)
@@ -13,7 +13,7 @@ local function has_feature(cfg)
 end
 
 ---Setup the Lf plugin
----@param cfg LfConfig
+---@param cfg Lf.Config
 function M.setup(cfg)
     if loaded then
         return
@@ -26,8 +26,13 @@ end
 
 ---Start the file manager
 ---`nil` can be used as the first parameter to change options and open in CWD
----@param path string optional path to start in
----@param cfg LfConfig
+---@param path? string optional path to start in
+---@param cfg? Lf.Config alternative configuration options
+---@overload fun(cfg: Lf.Config)                   Only a config
+---@overload fun(path: string)                    Only a path
+---@overload fun(path: string, cfg: Lf.Config)     Path and config are both valid
+---@overload fun(path: nil, cfg: Lf.Config)        Explicit nil to provide a config
+---@overload fun()                                Empty
 function M.start(path, cfg)
     local path_t = type(path)
     local Lf = require("lf.main")

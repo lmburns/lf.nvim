@@ -3,7 +3,7 @@
 This is a neovim plugin for the [`lf`](https://github.com/gokcehan/lf) file manager.
 It is very similar to [`lf.vim`](https://github.com/ptzz/lf.vim), except for that this is written in Lua.
 
-**NOTE**: This plugin uses [`toggleterm.nvim`](https://github.com/akinsho/toggleterm.nvim) and [`plenary.nvim`](https://github.com/nvim-lua/plenary.nvim)
+**NOTE**: This plugin uses [`toggleterm.nvim`](https://github.com/akinsho/toggleterm.nvim).
 
 ### Installation
 ```lua
@@ -15,24 +15,32 @@ use({
         vim.g.lf_netrw = 1
 
         require("lf").setup({
-                escape_quit = false,
-                border = "rounded",
-                -- highlights = {FloatBorder = {guifg = require("kimbox.palette").colors.magenta}}
+            escape_quit = false,
+            border = "rounded",
         })
 
-        vim.keymap.set("n", "<C-o>", ":Lf<CR>")
+        vim.keymap.set("n", "<M-o>", "<Cmd>Lf<CR>")
+
+        vim.api.nvim_create_autocmd({
+            event = "User",
+            pattern = "LfTermEnter",
+            callback = function(a)
+                vim.api.nvim_buf_set_keymap(a.buf, "t", "q", "q", {nowait = true})
+            end,
+        })
     end,
-    requires = {"plenary.nvim", "toggleterm.nvim"}
+    requires = {"toggleterm.nvim"}
 })
 ```
 
 ### Setup/Configuration
 
 ```lua
+local fn = vim.fn
+
 -- Defaults
 require("lf").setup({
-  default_cmd = "lf", -- default `lf` command
-  default_action = "edit", -- default action when `Lf` opens a file
+  default_action = "drop", -- default action when `Lf` opens a file
   default_actions = { -- default action keybindings
     ["<C-t>"] = "tabedit",
     ["<C-x>"] = "split",
@@ -43,37 +51,34 @@ require("lf").setup({
   winblend = 10, -- psuedotransparency level
   dir = "", -- directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
   direction = "float", -- window type: float horizontal vertical
-  border = "double", -- border kind: single double shadow curved
-  height = 0.80, -- height of the *floating* window
-  width = 0.85, -- width of the *floating* window
+  border = "rounded", -- border kind: single double shadow curved
+  height = fn.float2nr(fn.round(0.75 * o.lines)), -- height of the *floating* window
+  width = fn.float2nr(fn.round(0.75 * o.columns)), -- width of the *floating* window
   escape_quit = true, -- map escape to the quit command (so it doesn't go into a meta normal mode)
-  focus_on_open = false, -- focus the current file when opening Lf (experimental)
+  focus_on_open = true, -- focus the current file when opening Lf (experimental)
   mappings = true, -- whether terminal buffer mapping is enabled
   tmux = false, -- tmux statusline can be disabled on opening of Lf
   highlights = { -- highlights passed to toggleterm
-    Normal = { guibg = <VALUE> },
-    NormalFloat = { link = 'Normal' },
-    FloatBorder = {
-      guifg = <VALUE>,
-      guibg = <VALUE>
-    }
+    Normal = {link = "Normal"},
+    NormalFloat = {link = 'Normal'},
+    FloatBorder = {guifg = "<VALUE>", guibg = "<VALUE>"},
   },
 
   -- Layout configurations
-  layout_mapping = "<A-u>", -- resize window with this key
-
+  layout_mapping = "<M-u>", -- resize window with this key
   views = { -- window dimensions to rotate through
-    { width = 0.600, height = 0.600 },
-    {
-      width = 1.0 * fn.float2nr(fn.round(0.7 * o.columns)) / o.columns,
-      height = 1.0 * fn.float2nr(fn.round(0.7 * o.lines)) / o.lines,
-    },
-    { width = 0.800, height = 0.800 },
-    { width = 0.950, height = 0.950 },
-  }
+    {width = 0.800, height = 0.800},
+    {width = 0.600, height = 0.600},
+    {width = 0.950, height = 0.950},
+    {width = 0.500, height = 0.500, col = 0, row = 0},
+    {width = 0.500, height = 0.500, col = 0, row = 0.5},
+    {width = 0.500, height = 0.500, col = 0.5, row = 0},
+    {width = 0.500, height = 0.500, col = 0.5, row = 0.5},
 })
 
-vim.keymap.set("n", "<mapping>", "<cmd>lua require('lf').start()<CR>", {noremap = true})
+-- Equivalent
+vim.keymap.set("n", "<M-o>", "<Cmd>lua require('lf').start()<CR>", {noremap = true})
+vim.keymap.set("n", "<M-o>", "<Cmd>Lf<CR>", {noremap = true})
 ```
 
 Another option is to use `vim.keymap.set`, which requires `nvim` 0.7.0 or higher. This doesn't require local
@@ -156,8 +161,8 @@ The mappings that are listed in the `setup` call above are the default bindings.
 * `<C-t>` = `tabedit`
 * `<C-x>` = `split`
 * `<C-v>` = `vsplit`
-* `<C-o>` = `tab drop` (`<A-o>` is also suggested)
-* `<A-u>` = resize the floating window
+* `<C-o>` = `tab drop` (`<r-o>` is also suggested)
+* `<M-u>` = resize the floating window
 
 ### Notes
 The `autocmd` `LfTermEnter` is fired when the terminal buffer first opens

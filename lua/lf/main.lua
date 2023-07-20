@@ -22,7 +22,7 @@ local Config = require("lf.config")
 local Terminal = require("toggleterm.terminal").Terminal
 
 ---@class Lf
----@field cfg LfConfig Configuration options
+---@field cfg Lf.Config Configuration options
 ---@field term Terminal toggleterm terminal
 ---@field view_idx number Current index of configuration `views`
 ---@field winid? number `Terminal` window id
@@ -62,8 +62,7 @@ end
 ---Setup a new instance of `Lf`
 ---Configuration has not been fully parsed by the end of this function
 ---A `Terminal` becomes attached and is able to be toggled
----
----@param config? LfConfig
+---@param config? Lf.Config
 ---@return Lf
 function Lf:new(config)
     if config then
@@ -94,15 +93,14 @@ function Lf:__create_term()
         winblend = self.cfg.winblend,
         close_on_exit = true,
         hidden = false,
-        persist_size = false,
-        persist_mode = true,
+        clear_env = self.cfg.env.clear,
         highlights = self.cfg.highlights,
+        display_name = "Lf",
+        count = self.cfg.count,
         float_opts = {
             border = self.cfg.border,
             width = self.cfg.width,
             height = self.cfg.height,
-            row = self.cfg.row,
-            col = self.cfg.col,
             winblend = self.cfg.winblend,
         },
     })
@@ -130,7 +128,6 @@ end
 
 ---@private
 ---Set the directory for `Lf` to open in
----
 ---@param path? string
 ---@return Lf?
 function Lf:__open_in(path)
@@ -160,7 +157,6 @@ end
 
 ---@private
 ---Wrap the default command to write the selected files to a temporary file
----
 ---@return Lf
 function Lf:__set_cmd_wrapper()
     self.tmp_sel = os.tmpname()
