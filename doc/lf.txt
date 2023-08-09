@@ -119,6 +119,8 @@ Defaults ~
     focus_on_open = true, -- focus the current file when opening Lf (experimental)
     mappings = true, -- whether terminal buffer mapping is enabled
     tmux = false, -- tmux statusline can be disabled on opening of Lf
+    default_file_manager = false, -- make lf default file manager
+    disable_netrw_warning = true, -- don't display a message when opening a directory with `default_file_manager` as true
     highlights = { -- highlights passed to toggleterm
       Normal = {link = "Normal"},
       NormalFloat = {link = 'Normal'},

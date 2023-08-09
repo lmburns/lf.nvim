@@ -1,7 +1,12 @@
 local M = {}
-local loaded = false
 
+local Config = require("lf.config")
 local utils = require("lf.utils")
+
+local uv = vim.loop
+local api = vim.api
+local fn = vim.fn
+local cmd = vim.cmd
 
 ---Check Neovim version before setting mappings
 ---@param cfg Lf.Config
@@ -12,16 +17,83 @@ local function has_feature(cfg)
     end
 end
 
+---Make `Lf` become the file manager that opens whenever a directory buffer is loaded
+---@param bufnr integer
+---@return boolean
+local function become_dir_fman(bufnr)
+    local bufname = api.nvim_buf_get_name(bufnr)
+    if bufname == "" then
+        return false
+    end
+    local stat = uv.fs_stat(bufname)
+    if type(stat) ~= "table" or (type(stat) == "table" and stat.type ~= "directory") then
+        return false
+    end
+
+    return true
+end
+
+local function setup_autocmds()
+    api.nvim_create_user_command("Lf", function(tbl)
+        require("lf").start(tbl.args)
+    end, {nargs = "*", complete = "file"})
+
+    if Config.data.default_file_manager or vim.g.lf_netrw then
+        local group = api.nvim_create_augroup("Lf_ReplaceNetrw", {clear = true})
+
+        if vim.g.loaded_netrwPlugin ~= 1 and not Config.data.disable_netrw_warning then
+            api.nvim_create_autocmd("FileType", {
+                desc = "Display message about Lf not being default file manager",
+                group = group,
+                pattern = "netrw",
+                once = true,
+                callback = function()
+                    utils.warn([[Lf cannot be the default file manager with netrw enabled.]] ..
+                        [[Put `vim.g.loaded_netrwPlugin` in your configuration.]])
+                end,
+            })
+        end
+
+        api.nvim_create_autocmd("VimEnter", {
+            desc = "Override the default file manager (i.e., netrw)",
+            group = group,
+            pattern = "*",
+            nested = true,
+            callback = function(a)
+                if fn.exists("#FileExplorer") then
+                    api.nvim_create_augroup("FileExplorer", {clear = true})
+                end
+            end,
+        })
+
+        api.nvim_create_autocmd("BufEnter", {
+            desc = "After overriding default file manager, open Lf",
+            group = group,
+            pattern = "*",
+            once = true,
+            callback = function(a)
+                if become_dir_fman(a.buf) then
+                    vim.defer_fn(function()
+                        require("lf").start(a.file)
+                    end, 1)
+                end
+            end,
+        })
+    end
+end
+
 ---Setup the Lf plugin
 ---@param cfg Lf.Config
 function M.setup(cfg)
-    if loaded then
+    if Config.__loaded then
         return
     end
 
+    cfg = cfg or {}
     has_feature(cfg)
-    M.__conf = cfg or {}
-    loaded = true
+    M.__conf = cfg
+    Config.init()
+    setup_autocmds()
 end
 
 ---Start the file manager

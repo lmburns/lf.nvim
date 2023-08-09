@@ -68,7 +68,7 @@ function Lf:new(config)
     if config then
         self.cfg = Config:override(config)
     else
-        self.cfg = Config
+        self.cfg = Config.data
     end
 
     self.bufnr = 0
@@ -107,7 +107,7 @@ function Lf:__create_term()
 end
 
 ---Start the underlying terminal
----@param path? string path where Lf starts (reads from Config if none, else CWD)
+---@param path? string path where `Lf` starts (reads from `Config` if none, else CWD)
 function Lf:start(path)
     self:__open_in(path or self.cfg.dir)
     self:__set_cmd_wrapper()
@@ -238,6 +238,12 @@ function Lf:__on_open(term)
             end)
         end
     end
+
+    -- Don't know why whenever wrap is set in the terminal, a weird resize happens.
+    -- Because of that, this is needed here.
+    vim.defer_fn(function()
+        cmd("silent! doautoall VimResized")
+    end, 800)
 end
 
 ---@private

@@ -1,10 +1,19 @@
 local fn = vim.fn
 local o = vim.o
 
-local Config = {}
+local utils = require("lf.utils")
+
+---@class Lf.Container
+---@field data Lf.Config
+---@field group integer Autocmd id
+---@field __loaded boolean
+local Config = {
+    data = {},
+    __loaded = false,
+}
 
 ---@type Lf.Config
-local opts = {
+local default = {
     default_cmd = "lf",
     default_action = "drop",
     default_actions = {
@@ -12,6 +21,8 @@ local opts = {
         ["<C-x>"] = "split",
         ["<C-v>"] = "vsplit",
         ["<C-o>"] = "tab drop",
+        ["<C-e>"] = "edit",
+        ["<C-g>"] = "argedit",
     },
     winblend = 10,
     dir = "",
@@ -23,6 +34,8 @@ local opts = {
     focus_on_open = true,
     mappings = true,
     tmux = false,
+    default_file_manager = false,
+    disable_netrw_warning = true,
     highlights = {
         Normal = {link = "Normal"},
         FloatBorder = {link = "FloatBorder"},
@@ -63,7 +76,11 @@ local function validate(cfg)
         focus_on_open = {cfg.focus_on_open, "b", false},
         mappings = {cfg.mappings, "b", false},
         tmux = {cfg.tmux, "b", false},
+        default_file_manager = {cfg.default_file_manager, "b", false},
+        disable_netrw_warning = {cfg.disable_netrw_warning, "b", false},
         highlights = {cfg.highlights, "t", false},
+        count = {cfg.count, "n", true},
+        env = {cfg.env, "t", false},
         -- Layout configurations
         layout_mapping = {cfg.layout_mapping, "s", false},
         views = {cfg.views, "t", false},
@@ -75,34 +92,49 @@ local function validate(cfg)
     return cfg
 end
 
----@private
----Initialize the default configuration
-local function init()
-    local lf = require("lf")
-    -- Keep options from the `lf.setup()` call
-    Config = vim.tbl_deep_extend("keep", lf.__conf or {}, opts) --[[@as Lf.Config]]
-    Config = validate(Config)
-    lf.__conf = nil
-end
-
-init()
-
 ---Set a configuration passed as a function argument (not through `setup`)
 ---@param cfg? Lf.Config configuration options
 ---@return Lf.Config
 function Config:override(cfg)
     if type(cfg) == "table" then
-        self = vim.tbl_deep_extend("force", self, cfg) --[[@as Lf.Config]]
-        self = validate(self)
+        self.data = vim.tbl_deep_extend("force", self.data, cfg) --[[@as Lf.Config]]
+        self.data = validate(self.data)
+        -- self = vim.tbl_deep_extend("force", self, cfg) --[[@as Lf.Config]]
+        -- self = validate(self)
     end
     return self
+end
+
+---Return the configuration
+---@param key? string
+---@return Lf.Config
+function Config:get(key)
+    if key then
+        return self.data[key]
+    end
+    return self.data
+end
+
+---Initialize the default configuration
+function Config.init()
+    if Config.__loaded then
+        return
+    end
+
+    local lf = require("lf")
+    -- Keep options from the `lf.setup()` call
+    Config.data = vim.tbl_deep_extend("keep", lf.__conf or {}, default) --[[@as Lf.Config]]
+    Config.data = validate(Config.data)
+    lf.__conf = nil
+    Config.__loaded = true
 end
 
 return setmetatable(Config, {
     __index = function(self, key)
         return rawget(self, key)
     end,
-    __newindex = function(_self, _key, _val)
+    __newindex = function(_self, key, val)
+        utils.warn(("do not set invalid config values: %s => %s"):format(key, val))
     end,
 })
 
@@ -112,42 +144,44 @@ return setmetatable(Config, {
 ---@alias Lf.directory "'gwd'"|"''"|nil|string
 
 ---@class Lf.views
----@field relative "'editor'"|"'win'"|"'cursor'"|"'mouse'"
----@field win integer For `relative='win'`
----@field anchor "'NW'"|"'NE'"|"'SW'"|"'SE'" Which corner of float to place `(row, col)`
 ---@field width number
 ---@field height number
----@field bufpos {row: number, col: number}
----@field row integer|float
----@field col integer|float
----@field focusable boolean
----@field zindex number
----@field style "'minimal'"
----@field border Lf.border Border kind
----@field title string|{[1]: string, [2]: string}[] Can be a string or an array of tuples
----@field title_pos "'left'"|"'center'"|"'right'"
----@field noautocmd boolean
+---@field relative? "'editor'"|"'win'"|"'cursor'"|"'mouse'"
+---@field win? integer For `relative='win'`
+---@field anchor? "'NW'"|"'NE'"|"'SW'"|"'SE'" Which corner of float to place `(row, col)`
+---@field bufpos? {row: number, col: number}
+---@field row? integer|float
+---@field col? integer|float
+---@field focusable? boolean
+---@field zindex? number
+---@field style? "'minimal'"
+---@field border? Lf.border Border kind
+---@field title? string|{[1]: string, [2]: string}[] Can be a string or an array of tuples
+---@field title_pos? "'left'"|"'center'"|"'right'"
+---@field noautocmd? boolean
 
 ---@class Lf.env
 ---@field clear boolean Should environment variables be cleared?
 ---@field vars table<string, string|number> Hash of variables to be set on startup
 
 ---@class Lf.Config
----@field default_cmd string Default `lf` command
----@field default_action string Default action when `Lf` opens a file
----@field default_actions table<string, string> Default action keybindings
----@field winblend number Psuedotransparency level
----@field dir Lf.directory Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
----@field direction Lf.direction Window layout
----@field border Lf.border Border kind
----@field width integer Width of the *floating* window
----@field height integer Height of the *floating* window
----@field escape_quit boolean Whether escape should be mapped to quit
----@field focus_on_open boolean Whether Lf should open focused on current file
----@field mappings boolean Whether terminal buffer mappings should be set
----@field tmux boolean Whether `tmux` statusline should be changed by this plugin
----@field env Lf.env Environment variables
----@field highlights table<string, table<string, string>> Highlight table passed to `toggleterm`
----@field layout_mapping string Keybinding to rotate through the window layouts
----@field views Lf.views[] Table of layouts to be applied to `nvim_win_set_config`
+---@field default_cmd? string Default `lf` command
+---@field default_action? string Default action when `Lf` opens a file
+---@field default_actions? table<string, string> Default action keybindings
+---@field winblend? number Psuedotransparency level
+---@field dir? Lf.directory Directory where `lf` starts ('gwd' is git-working-directory, ""/nil is CWD)
+---@field direction? Lf.direction Window layout
+---@field border? Lf.border Border kind
+---@field width? integer Width of the *floating* window
+---@field height? integer Height of the *floating* window
+---@field escape_quit? boolean Whether escape should be mapped to quit
+---@field focus_on_open? boolean Whether Lf should open focused on current file
+---@field mappings? boolean Whether terminal buffer mappings should be set
+---@field tmux? boolean Whether `tmux` statusline should be changed by this plugin
+---@field default_file_manager? boolean Make lf the default file manager for neovim
+---@field disable_netrw_warning? boolean Don't display a message when opening a directory with `default_file_manager` as true
+---@field highlights? table<string, table<string, string>> Highlight table passed to `toggleterm`
+---@field layout_mapping? string Keybinding to rotate through the window layouts
+---@field views? Lf.views[] Table of layouts to be applied to `nvim_win_set_config`
+---@field env? Lf.env Environment variables
 ---@field count? integer A number that triggers that specific terminal
