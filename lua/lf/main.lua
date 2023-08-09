@@ -32,6 +32,7 @@ local Terminal = require("toggleterm.terminal").Terminal
 ---@field tmp_lastdir string Path to a file containing the last directory `lf` was in
 ---@field id number? Current `lf` session id
 ---@field bufnr number The open file's buffer number
+---@field arglist string[] The argument list to neovim
 ---@field action string The current action to open the file
 ---@field signcolumn string The signcolumn set by the user before the terminal buffer overrides it
 local Lf = {}
@@ -72,6 +73,7 @@ function Lf:new(config)
     end
 
     self.bufnr = 0
+    self.arglist = fn.argv()
     self.view_idx = 1
     self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
@@ -269,7 +271,11 @@ function Lf:__callback(term)
         for fname in io.lines(self.tmp_sel) do
             local stat = uv.fs_stat(fname)
             if type(stat) == "table" then
-                cmd(("%s %s"):format(self.action, fn.fnameescape(fname)))
+                local fesc = fn.fnameescape(fname)
+                cmd(("%s %s"):format(self.action, fesc))
+                cmd.argadd(table.concat(self.arglist, " "))
+                self.arglist = fn.argv()
+                cmd.argdedupe()
             end
         end
     end
