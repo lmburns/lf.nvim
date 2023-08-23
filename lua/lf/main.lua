@@ -73,7 +73,14 @@ function Lf:new(config)
     end
 
     self.bufnr = 0
-    self.arglist = fn.argv()
+    local args = {}
+    for _, arg in ipairs(fn.argv()) do
+        local bufnr = fn.bufnr(arg)
+        if api.nvim_buf_is_loaded(bufnr) then
+            table.insert(args, arg)
+        end
+    end
+    self.arglist = args
     self.view_idx = 1
     self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
@@ -274,8 +281,15 @@ function Lf:__callback(term)
                 local fesc = fn.fnameescape(fname)
                 cmd(("%s %s"):format(self.action, fesc))
                 cmd.argadd(table.concat(self.arglist, " "))
-                self.arglist = fn.argv()
                 cmd.argdedupe()
+                local args = {}
+                for _, arg in ipairs(fn.argv()) do
+                    local bufnr = fn.bufnr(arg)
+                    if api.nvim_buf_is_loaded(bufnr) then
+                        table.insert(args, arg)
+                    end
+                end
+                self.arglist = args
             end
         end
     end
