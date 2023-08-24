@@ -182,7 +182,7 @@ function Lf:__set_cmd_wrapper()
 
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
     self.term.cmd =
-        ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' %s]])
+        ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' '%s']])
         :format(self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel, open_on)
     return self
 end
