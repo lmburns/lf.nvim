@@ -225,10 +225,8 @@ function Lf:__on_open(term)
                 -- Change default_action for easier reading in the callback
                 self.action = mapping
 
-                if not self.id then
-                    local res = utils.read_file(self.tmp_id)
-                    self.id = tonumber(res)
-                end
+                local res = utils.read_file(self.tmp_id)
+                self.id = tonumber(res)
 
                 fn.system({"lf", "-remote", ("send %d open"):format(self.id)})
             end, {noremap = true, buffer = self.bufnr, desc = ("Lf %s"):format(mapping)})
