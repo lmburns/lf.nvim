@@ -81,6 +81,8 @@ local function validate(cfg)
         highlights = {cfg.highlights, "t", false},
         count = {cfg.count, "n", true},
         env = {cfg.env, "t", false},
+        env_vars = {cfg.env.vars, "t", false},
+        env_clear = {cfg.env.clear, "b", false},
         -- Layout configurations
         layout_mapping = {cfg.layout_mapping, "s", false},
         views = {cfg.views, "t", false},
@@ -99,10 +101,8 @@ function Config:override(cfg)
     if type(cfg) == "table" then
         self.data = vim.tbl_deep_extend("force", self.data, cfg) --[[@as Lf.Config]]
         self.data = validate(self.data)
-        -- self = vim.tbl_deep_extend("force", self, cfg) --[[@as Lf.Config]]
-        -- self = validate(self)
     end
-    return self
+    return self.data
 end
 
 ---Return the configuration

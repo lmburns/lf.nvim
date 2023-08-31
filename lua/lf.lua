@@ -6,7 +6,6 @@ local utils = require("lf.utils")
 local uv = vim.loop
 local api = vim.api
 local fn = vim.fn
-local cmd = vim.cmd
 
 ---Check Neovim version before setting mappings
 ---@param cfg Lf.Config
@@ -124,6 +123,7 @@ function M.start(path, cfg)
             return
         end
 
+        local opts = vim.tbl_deep_extend("keep", cfg or {}, Config.data)
         Lf:new(cfg or M.__conf):start(path)
     end
 end

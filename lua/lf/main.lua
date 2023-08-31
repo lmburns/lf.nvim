@@ -72,15 +72,8 @@ function Lf:new(config)
         self.cfg = Config.data
     end
 
+    self:__set_argv()
     self.bufnr = 0
-    local args = {}
-    for _, arg in ipairs(fn.argv()) do
-        local bufnr = fn.bufnr(arg)
-        if api.nvim_buf_is_loaded(bufnr) then
-            table.insert(args, arg)
-        end
-    end
-    self.arglist = args
     self.view_idx = 1
     self.action = self.cfg.default_action
     -- Needs to be grabbed here before the terminal buffer is created
@@ -183,7 +176,13 @@ function Lf:__set_cmd_wrapper()
     -- command lf -command '$printf $id > '"$fid"'' -last-dir-path="$tmp" "$@"
     self.term.cmd =
         ([[%s -command='$printf $id > %s' -last-dir-path='%s' -selection-path='%s' '%s']])
-        :format(self.term.cmd, self.tmp_id, self.tmp_lastdir, self.tmp_sel, open_on)
+        :format(
+            self.term.cmd,
+            self.tmp_id,
+            self.tmp_lastdir,
+            self.tmp_sel,
+            open_on
+        )
     return self
 end
 
@@ -280,14 +279,7 @@ function Lf:__callback(term)
                 cmd(("%s %s"):format(self.action, fesc))
                 cmd.argadd(table.concat(self.arglist, " "))
                 cmd.argdedupe()
-                local args = {}
-                for _, arg in ipairs(fn.argv()) do
-                    local bufnr = fn.bufnr(arg)
-                    if api.nvim_buf_is_loaded(bufnr) then
-                        table.insert(args, arg)
-                    end
-                end
-                self.arglist = args
+                self:__set_argv()
             end
         end
     end
@@ -296,6 +288,18 @@ function Lf:__callback(term)
     vim.defer_fn(function()
         self.action = self.cfg.default_action
     end, 1)
+end
+
+---@private
+---Set the arglist value
+function Lf:__set_argv()
+    local args = {}
+    for _, arg in ipairs(fn.argv()) do
+        if api.nvim_buf_is_loaded(fn.bufnr(arg)) then
+            table.insert(args, uv.fs_realpath(arg))
+        end
+    end
+    self.arglist = args
 end
 
 return Lf
