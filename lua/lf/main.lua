@@ -277,8 +277,11 @@ function Lf:__callback(term)
             if type(stat) == "table" then
                 local fesc = fn.fnameescape(fname)
                 cmd(("%s %s"):format(self.action, fesc))
-                cmd.argadd(table.concat(self.arglist, " "))
-                cmd.argdedupe()
+                local args = table.concat(self.arglist, " ")
+                if string.len(args) > 0 then
+                  cmd.argadd(args)
+                  cmd.argdedupe()
+                end
                 self:__set_argv()
             end
         end
